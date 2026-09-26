@@ -1,0 +1,15 @@
+[project]
+name = "strider"
+version = "0.1.0"
+description = "My personal running coach"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "duckdb>=1.5.5",
+    "fastapi>=0.141.1",
+    "fitdecode>=0.11.0",
+    "garminconnect>=0.3.16",
+    "polar>=0.0.127",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+]
