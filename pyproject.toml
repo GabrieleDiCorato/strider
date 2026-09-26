@@ -13,3 +13,8 @@ dependencies = [
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
 ]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.3.0",
+]

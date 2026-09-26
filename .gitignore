@@ -157,6 +157,10 @@ ENV/
 env.bak/
 venv.bak/
 
+# Strider local data & personal health/activity exports (never commit real athlete data)
+/data/
+notebooks/_scratch/
+
 # Spyder project settings
 .spyderproject
 .spyproject
