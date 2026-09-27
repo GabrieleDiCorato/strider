@@ -9,7 +9,8 @@ dependencies = [
     "fastapi>=0.141.1",
     "fitdecode>=0.11.0",
     "garminconnect>=0.3.16",
-    "polar>=0.0.127",
+    "pandera>=0.33.1",
+    "polars>=1.44.2",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
 ]

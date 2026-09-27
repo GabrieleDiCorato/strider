@@ -36,6 +36,9 @@ MANIFEST
 pip-log.txt
 pip-delete-this-directory.txt
 
+# Github
+.github/
+
 # Unit test / coverage reports
 htmlcov/
 .tox/
@@ -178,6 +181,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+docs/
 
 # pytype static type analyzer
 .pytype/
