@@ -28,11 +28,16 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class GarminSettings(BaseModel):
-    """Credentials and session options for the Garmin Connect vendor adapter.
+    """Login credentials and session options for the Garmin Connect vendor adapter.
 
     Maps to `garminconnect.Garmin(email, password, is_cn=...)`. The token
     store lets the adapter reuse a cached OAuth session across runs instead
     of re-authenticating (and potentially re-prompting for MFA) every time.
+
+    This is *authentication material*, not identity: it says which Garmin account to log
+    into, not who that account belongs to in Strider's own terms. The (non-secret) link
+    between a Strider user and this Garmin account is recorded separately in
+    `core.schemas.GarminAccountLink`, which never duplicates the password.
     """
 
     email: str = Field(..., description="Garmin Connect account email/username.")
@@ -41,11 +46,14 @@ class GarminSettings(BaseModel):
         default=False,
         description="Set True for accounts registered on the China (garmin.cn) service.",
     )
-    tokenstore_path: Path = Field(
-        default_factory=lambda: Path.home() / ".garminconnect",
+    tokenstore_path: Path | None = Field(
+        default=None,
         description=(
-            "Directory used by garminconnect to cache OAuth tokens between "
-            "sessions, avoiding a fresh credential login on every run."
+            "Directory used by garminconnect to cache OAuth tokens between sessions, "
+            "avoiding a fresh credential login on every run. Defaults to a user-scoped "
+            "`<data.root_dir>/auth/{user_id}/garmin` (resolved by `Settings`), keeping "
+            "token caches isolated per Strider user rather than one shared machine-wide "
+            "directory."
         ),
     )
 
@@ -116,9 +124,23 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    user_id: str = Field(
+        ...,
+        description=(
+            "Stable identifier for the athlete this local instance serves. Required (not "
+            "defaulted) so every ledger entry, file path, and partition key is explicitly "
+            "user-scoped from day one, even though today's deployment model is single-user. "
+            "This is Strider's own id, never a vendor account id — see `core.schemas.User` "
+            "and `core.schemas.GarminAccountLink` for how vendor accounts reference it."
+        ),
+    )
     garmin: GarminSettings
     data: DataPathSettings = Field(default_factory=DataPathSettings)
     rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.garmin.tokenstore_path is None:
+            self.garmin.tokenstore_path = self.data.root_dir / "auth" / self.user_id / "garmin"
 
 
 @lru_cache

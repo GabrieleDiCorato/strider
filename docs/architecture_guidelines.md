@@ -145,3 +145,8 @@ strider/
 │   └── silver/                 # Hive-partitioned Parquet files
 └── README.md
 ```
+
+## 10. Future Feature Explorations
+
+*   **Geographic Data Visualization:** The first step is displaying the GPS trace points (extracted from Bronze `.FIT` files and standardized in Silver) on interactive maps. This will allow the athlete to visually review their completed routes.
+*   **Route Planning:** A subsequent, distinct feature to enable the athlete (or the AI Coach) to plan, generate, or explore new running routes (e.g., using open routing APIs like Mapbox or OSRM).

@@ -32,6 +32,7 @@ from pathlib import Path
 from garminconnect import Garmin, GarminConnectTooManyRequestsError
 
 from src.core.config import Settings
+from src.core.schemas import GarminAccountLink
 
 logger = logging.getLogger(__name__)
 
@@ -140,3 +141,18 @@ def login(client: Garmin, settings: Settings, *, force: bool = False) -> Garmin:
         cooldown_path.unlink(missing_ok=True)
 
     return client
+
+
+def build_account_link(settings: Settings) -> GarminAccountLink:
+    """Build the `GarminAccountLink` for the configured user directly from settings.
+
+    No Garmin API call is needed: unlike a vendor-internal id, everything this link
+    records (email, token store location) is already known from configuration. Persist
+    the result via `ingestion.accounts.AccountStore.link_garmin_account()`.
+    """
+    return GarminAccountLink(
+        user_id=settings.user_id,
+        email=settings.garmin.email,
+        tokenstore_path=str(settings.garmin.tokenstore_path),
+        linked_at=datetime.now(timezone.utc),
+    )
