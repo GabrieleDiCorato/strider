@@ -224,3 +224,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Ignore local personal test data
+tests/resources/garmin/*.zip
+!tests/resources/garmin/wellness_2026-01-01.zip
+!tests/resources/garmin/activity_user.zip
