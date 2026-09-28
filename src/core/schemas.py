@@ -7,174 +7,673 @@ Per architecture guidelines §4:
 - Every Silver record is explicitly `user_id`-scoped and carries a clear, entity-specific
   primary key (never a generic, ambiguous identifier).
 
+Silver is vendor-blind: no `vendor` field on Silver records.  Vendor provenance is
+tracked exclusively in the Bronze ledger (`BronzeLedgerEntry.vendor`).
+
+Time-series data (1 Hz HR, GPS, stress epochs) is NOT materialized in Silver.  Silver
+stores pre-aggregated summaries (one row per entity instance).  Raw time-series stays
+in Bronze FIT files and is read on-demand by Gold-layer computations.
+
 `src/core/dataframes.py` derives the Pandera/Polars DataFrame contracts from these same
 models, so there is exactly one place that defines each entity's shape.
-
-Identifier namespaces are NOT interchangeable: `user_id` is always Strider's own
-internal identifier (see `core.config.Settings.user_id` and `User` below), never a
-vendor's account identifier. `GarminAccountLink` shows how a vendor account is
-referenced by that identifier without ever duplicating vendor secrets.
 """
 
-from datetime import datetime, date
+from __future__ import annotations
+
+from datetime import date, datetime
+from enum import Enum
 from typing import Any
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel, Field, ConfigDict
 
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Domain enums — strict typing for universal concepts
+# ---------------------------------------------------------------------------
+
+class EntityType(str, Enum):
+    """Bronze/Silver entity families driven by the pipeline."""
+
+    ACTIVITY = "activity"
+    DAILY_SUMMARY = "daily_summary"
+    WORKOUT_DEFINITION = "workout_definition"
+    WORKOUT_CALENDAR = "workout_calendar"
+
+
+class SportType(str, Enum):
+    """Canonical sport types supported by the coaching domain.
+
+    Vendor-specific sub-types (e.g. ``treadmill_running``, ``indoor_cycling``)
+    are captured in the free-form ``sport_sub_type`` field on the Silver model,
+    NOT by extending this enum — that would couple the universal schema to
+    every vendor's idiosyncratic type taxonomy.
+    """
+
+    RUNNING = "running"
+    TRAIL_RUNNING = "trail_running"
+    CYCLING = "cycling"
+    WALKING = "walking"
+    HIKING = "hiking"
+    SWIMMING = "swimming"
+    OTHER = "other"
+
+
+class StepType(str, Enum):
+    """Workout step types within a structured workout definition."""
+
+    WARMUP = "warmup"
+    COOLDOWN = "cooldown"
+    INTERVAL = "interval"
+    RECOVERY = "recovery"
+    REST = "rest"
+    REPEAT = "repeat"
+    OTHER = "other"
+
+
+class DurationType(str, Enum):
+    """How a workout step's duration / end-condition is defined."""
+
+    TIME = "time"
+    DISTANCE = "distance"
+    OPEN = "open"  # "press lap" / manual advance
+    CALORIES = "calories"
+    OTHER = "other"
+
+
+class TargetType(str, Enum):
+    """Target metric for a workout step's intensity prescription."""
+
+    HEART_RATE = "heart_rate"
+    PACE = "pace"
+    SPEED = "speed"
+    POWER = "power"
+    CADENCE = "cadence"
+    OPEN = "open"  # no specific target
+    OTHER = "other"
+
+
+class TrainingStatus(str, Enum):
+    """Training status labels.
+
+    These originate as a Garmin-proprietary concept but are promoted to a
+    first-class enum because they directly inform coaching decisions.
+    """
+
+    PRODUCTIVE = "productive"
+    MAINTAINING = "maintaining"
+    RECOVERY = "recovery"
+    UNPRODUCTIVE = "unproductive"
+    DETRAINING = "detraining"
+    PEAKING = "peaking"
+    OVERREACHING = "overreaching"
+    NO_STATUS = "no_status"
+
+
+class HrvStatus(str, Enum):
+    """HRV readiness status."""
+
+    BALANCED = "balanced"
+    UNBALANCED = "unbalanced"
+    LOW = "low"
+    POOR = "poor"
+    NO_STATUS = "no_status"
+
+basic_config = ConfigDict(
+    extra="forbid",
+    frozen=True
+    )
+
+# ---------------------------------------------------------------------------
 # Identity (Strider users <-> linked vendor accounts)
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+
 class User(BaseModel):
-    """
-    A Strider user: the root identity every data layer (ledger, Silver partitions, agent
-    memory) partitions on. Vendor account links (e.g. `GarminAccountLink`) reference
-    `user_id` as a foreign key; this model itself never stores vendor credentials.
+    model_config = basic_config
+    """A Strider user: the root identity every data layer partitions on.
+
+    Vendor account links (e.g. ``GarminAccountLink``) reference ``user_id``
+    as a foreign key; this model itself never stores vendor credentials.
     """
 
-    user_id: str = Field(..., description="Primary key. Strider's internal user identifier.")
-    display_name: str | None = Field(default=None, description="Human-readable name for UI/logging.")
-    created_at: datetime = Field(..., description="When this user was first registered.")
+    user_id: str = Field(
+        ..., description="Primary key. Strider's internal user identifier."
+    )
+    display_name: str | None = Field(
+        default=None, description="Human-readable name for UI/logging."
+    )
+    created_at: datetime = Field(
+        ..., description="When this user was first registered."
+    )
 
 
 class GarminAccountLink(BaseModel):
-    """
-    Links a Strider `user_id` to the Garmin account used to fetch their data.
+    """Links a Strider ``user_id`` to the Garmin account used to fetch data.
 
-    Deliberately does NOT store the Garmin password: secrets stay exclusively in
-    `core.config.GarminSettings`, sourced from `.env` (or a future secrets manager),
-    never duplicated into this table. Only the login email (low sensitivity, needed to
-    identify *which* account) and OAuth session bookkeeping are persisted here, so a
-    future multi-user deployment can look up "which Garmin account authenticates for
-    this user" without requiring per-user `.env` files.
+    Does NOT store the Garmin password: secrets stay exclusively in
+    ``core.config.GarminSettings``, sourced from ``.env``.
     """
 
     user_id: str = Field(..., description="FK to User.user_id.")
-    email: str = Field(..., description="Garmin Connect login email for this account.")
+    email: str = Field(
+        ..., description="Garmin Connect login email for this account."
+    )
     tokenstore_path: str = Field(
-        ..., description="Path to this user's cached Garmin OAuth token store (garth session, not a password)."
+        ...,
+        description="Path to this user's cached Garmin OAuth token store.",
     )
-    linked_at: datetime = Field(..., description="When this Garmin account was linked to the user.")
+    linked_at: datetime = Field(
+        ..., description="When this Garmin account was linked to the user."
+    )
     last_authenticated_at: datetime | None = Field(
-        default=None, description="Last time a login (cached-token or credential) succeeded for this account."
+        default=None,
+        description="Last time a login succeeded for this account.",
     )
 
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Bronze Layer (Ledger)
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+
 class BronzeLedgerEntry(BaseModel):
-    """
-    Schema for the Bronze sync ledger.
-    Describes what was fetched for idempotency and audit, not the payload contents.
+    """Schema for the Bronze sync ledger.
+
+    Describes *what was fetched* for idempotency and audit — not the payload
+    contents.  ``entity_type`` is now an ``EntityType`` enum rather than a
+    free-form string.
     """
 
-    user_id: str = Field(..., description="FK to User.user_id (not a vendor account id).")
-    vendor: str = Field(..., description="Vendor name, e.g. 'garmin'.")
-    entity_type: str = Field(
-        ..., description="One of 'activity', 'wellness', 'workout_definition', 'workout_calendar'."
+    user_id: str = Field(
+        ..., description="FK to User.user_id (not a vendor account id)."
     )
-    source_identifier: str = Field(..., description="Vendor's identifier for the fetched entity.")
-    content_hash: str = Field(..., description="Hash of the raw payload, used to detect upstream mutations.")
-    fetch_timestamp: datetime = Field(..., description="When this payload was fetched from the vendor.")
-    file_path: str = Field(..., description="Path to the immutable raw payload on disk.")
-
-
-# -----------------------------------------------------------------------------
-# Silver Layer (Universal Vendor-Agnostic Models)
-# -----------------------------------------------------------------------------
-class SilverRecordBase(BaseModel):
-    """
-    Base contract shared by all Silver-layer entities.
-    Enforces user_id partitioning and a flexible vendor_specific payload. Deliberately
-    does NOT define a generic identifier field: each concrete entity below declares its
-    own explicitly-named primary key (e.g. `activity_id`), per the architecture's
-    requirement for "clear primary keys per entity".
-    """
-
-    user_id: str = Field(..., description="FK to User.user_id (not a vendor account id).")
     vendor: str = Field(..., description="Vendor name, e.g. 'garmin'.")
-    updated_at: datetime = Field(..., description="Last time this record was refreshed from the vendor.")
+    entity_type: EntityType = Field(
+        ..., description="Which entity family this payload belongs to."
+    )
+    source_identifier: str = Field(
+        ..., description="Vendor's identifier for the fetched entity."
+    )
+    content_hash: str = Field(
+        ...,
+        description="Hash of the raw payload, used to detect upstream mutations.",
+    )
+    fetch_timestamp: datetime = Field(
+        ..., description="When this payload was fetched from the vendor."
+    )
+    file_path: str = Field(
+        ..., description="Path to the immutable raw payload on disk."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Silver Layer — Base
+# ---------------------------------------------------------------------------
+
+class SilverRecordBase(BaseModel):
+    """Base contract shared by all Silver-layer entities.
+
+    Silver is vendor-blind — there is no ``vendor`` field.  Vendor provenance
+    lives in the Bronze ledger.  The ``vendor_specific`` dict is an escape
+    hatch for proprietary metrics that don't yet have universal typed columns;
+    downstream code should never need to parse it for core coaching logic.
+
+    Each concrete Silver entity declares its own explicitly-named primary key
+    (e.g. ``activity_id``, ``calendar_date``).
+    """
+
+    user_id: str = Field(
+        ..., description="FK to User.user_id (not a vendor account id)."
+    )
+    updated_at: datetime = Field(
+        ...,
+        description="Last time this record was refreshed from the vendor.",
+    )
     vendor_specific: dict[str, Any] = Field(
-        default_factory=dict, description="Flexible JSON column for proprietary metrics."
+        default_factory=dict,
+        description=(
+            "Escape hatch for proprietary metrics not yet promoted to "
+            "typed columns."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Silver Layer — Activity
+# ---------------------------------------------------------------------------
+
+class LapSummary(BaseModel):
+    """Pre-aggregated per-lap metrics, extracted from FIT lap messages.
+
+    Stored as a JSON-serialized list on ``SilverActivity.lap_summaries``.
+    """
+
+    lap_number: int = Field(
+        ..., description="1-based lap index within the activity."
+    )
+    duration_seconds: float = Field(
+        ..., description="Lap elapsed time in seconds."
+    )
+    distance_meters: float | None = Field(
+        default=None, description="Lap distance in meters."
+    )
+    avg_heart_rate: float | None = Field(
+        default=None, description="Lap average HR in bpm."
+    )
+    max_heart_rate: float | None = Field(
+        default=None, description="Lap max HR in bpm."
+    )
+    avg_cadence: float | None = Field(
+        default=None,
+        description="Lap average cadence (spm for running, rpm for cycling).",
+    )
+    avg_speed_mps: float | None = Field(
+        default=None, description="Lap average speed in m/s."
+    )
+    avg_power: float | None = Field(
+        default=None, description="Lap average power in watts."
+    )
+    total_ascent_meters: float | None = Field(
+        default=None, description="Lap total ascent in meters."
+    )
+    total_descent_meters: float | None = Field(
+        default=None, description="Lap total descent in meters."
     )
 
 
 class SilverActivity(SilverRecordBase):
-    """
-    Standardized Activity record (e.g., a run or a cycle), one row per recorded activity.
+    """Standardized activity record — one row per recorded activity.
+
+    Contains scalar summary metrics computed from FIT session/lap messages
+    plus pre-aggregated time-series summaries (HR zone distribution, per-lap
+    breakdowns).
+
+    Raw time-series data (1 Hz HR, GPS, cadence) is NOT materialized here —
+    it stays in Bronze FIT files and is read on-demand by Gold-layer
+    computations (e.g. cardiac drift, pace decoupling).
     """
 
-    activity_id: str = Field(..., description="Primary key. Vendor's unique activity identifier.")
-    start_time: datetime = Field(..., description="Activity start timestamp.")
-    activity_type: str = Field(..., description="Universal activity type, e.g. 'running', 'cycling'.")
-    duration_seconds: float | None = Field(default=None, description="Elapsed duration in seconds.")
-    distance_meters: float | None = Field(default=None, description="Total distance covered in meters.")
-    avg_heart_rate: float | None = Field(default=None, description="Average heart rate in bpm.")
-    max_heart_rate: float | None = Field(default=None, description="Maximum heart rate in bpm.")
-    avg_speed_mps: float | None = Field(default=None, description="Average speed in meters/second.")
-    elevation_gain_meters: float | None = Field(default=None, description="Total ascent in meters.")
-    calories: float | None = Field(default=None, description="Estimated calories burned.")
+    # ── Identity & type ────────────────────────────────────
+    activity_id: str = Field(
+        ..., description="Primary key. Vendor's unique activity identifier."
+    )
+    sport_type: SportType = Field(
+        ..., description="Canonical sport type (enum)."
+    )
+    sport_sub_type: str | None = Field(
+        default=None,
+        description=(
+            "Vendor-specific sub-type "
+            "(e.g. 'treadmill_running', 'indoor_cycling')."
+        ),
+    )
+
+    # ── Timing ─────────────────────────────────────────────
+    start_time: datetime = Field(
+        ..., description="Activity start timestamp (local)."
+    )
+    end_time: datetime | None = Field(
+        default=None, description="Activity end timestamp (local)."
+    )
+    duration_seconds: float | None = Field(
+        default=None,
+        description="Total elapsed time in seconds (including pauses).",
+    )
+    moving_time_seconds: float | None = Field(
+        default=None,
+        description=(
+            "Moving/active time in seconds (excluding auto-pause). "
+            "Fundamental for accurate pace computation."
+        ),
+    )
+
+    # ── Distance & elevation ───────────────────────────────
+    distance_meters: float | None = Field(
+        default=None, description="Total distance in meters."
+    )
+    total_ascent_meters: float | None = Field(
+        default=None, description="Total ascent (climb) in meters."
+    )
+    total_descent_meters: float | None = Field(
+        default=None, description="Total descent in meters."
+    )
+
+    # ── Heart rate ─────────────────────────────────────────
+    avg_heart_rate: float | None = Field(
+        default=None, description="Average HR in bpm."
+    )
+    max_heart_rate: float | None = Field(
+        default=None, description="Peak HR in bpm."
+    )
+    hr_zone_seconds: list[float] | None = Field(
+        default=None,
+        description=(
+            "Time spent in each HR zone (seconds), ordered zone 1 → zone N. "
+            "Pre-aggregated from FIT time_in_hr_zone fields."
+        ),
+    )
+
+    # ── Speed & pace ───────────────────────────────────────
+    avg_speed_mps: float | None = Field(
+        default=None, description="Average speed in m/s."
+    )
+    max_speed_mps: float | None = Field(
+        default=None, description="Peak speed in m/s."
+    )
+
+    # ── Cadence ────────────────────────────────────────────
+    avg_cadence: float | None = Field(
+        default=None,
+        description="Average cadence — steps/min for running, rpm for cycling.",
+    )
+    max_cadence: float | None = Field(
+        default=None, description="Peak cadence."
+    )
+
+    # ── Power ──────────────────────────────────────────────
+    avg_power: float | None = Field(
+        default=None, description="Average power in watts."
+    )
+    max_power: float | None = Field(
+        default=None, description="Peak power in watts."
+    )
+    normalized_power: float | None = Field(
+        default=None,
+        description=(
+            "Normalized power (watts). Represents the physiological cost "
+            "of variable-intensity effort."
+        ),
+    )
+
+    # ── Training stimulus ──────────────────────────────────
+    training_effect_aerobic: float | None = Field(
+        default=None, description="Aerobic training effect (0.0–5.0 scale)."
+    )
+    training_effect_anaerobic: float | None = Field(
+        default=None,
+        description="Anaerobic training effect (0.0–5.0 scale).",
+    )
+    calories: float | None = Field(
+        default=None, description="Estimated calories burned."
+    )
+    avg_temperature_celsius: float | None = Field(
+        default=None,
+        description="Average ambient temperature during activity (°C).",
+    )
+
+    # ── Lap structure (pre-aggregated) ─────────────────────
+    lap_count: int | None = Field(
+        default=None, description="Number of laps/splits."
+    )
+    lap_summaries: list[LapSummary] | None = Field(
+        default=None,
+        description="Per-lap summary metrics. JSON-serialized in Parquet.",
+    )
+
+    # ── Workout linkage ────────────────────────────────────
     workout_id: str | None = Field(
         default=None,
-        description="FK to SilverWorkoutDefinition.workout_id, if this activity followed a planned workout.",
+        description=(
+            "FK to SilverWorkoutDefinition.workout_id, if this activity "
+            "followed a planned workout."
+        ),
     )
     is_planned_workout: bool = Field(
-        default=False, description="Whether this activity was executed against a planned workout."
+        default=False,
+        description="Whether this activity was executed against a planned workout.",
     )
 
 
-class SilverWellness(SilverRecordBase):
-    """
-    Daily wellness snapshot (sleep, HRV, readiness). One row per user per calendar day.
+# ---------------------------------------------------------------------------
+# Silver Layer — Daily Summary  (replaces the former SilverWellness)
+# ---------------------------------------------------------------------------
+
+class SilverDailySummary(SilverRecordBase):
+    """Complete daily physiological snapshot — one row per user per day.
+
+    Covers the full readiness picture a coaching agent needs: sleep
+    architecture, recovery signals (HRV, resting HR, body battery), stress,
+    respiratory and SpO2 metrics, and training status.
+
+    Fields are logically grouped by physiological concern but stored in a
+    single wide table.  Parquet's columnar format means unused columns cost
+    nothing at query time, and the coaching agent's most common query ("how
+    is the athlete today?") gets everything in one scan without joins.
+
+    Raw time-series data (HR epochs, stress curves, body battery values) is
+    NOT materialized here — it stays in Bronze FIT files.
     """
 
-    calendar_date: date = Field(..., description="Primary key (per user).")
-    sleep_score: float | None = Field(default=None, description="Vendor-computed overnight sleep score.")
-    resting_hr: float | None = Field(default=None, description="Resting heart rate in bpm.")
-    hrv_status: str | None = Field(default=None, description="Vendor-computed HRV status label, e.g. 'BALANCED'.")
-    avg_stress_level: float | None = Field(default=None, description="Average daily stress level.")
-    steps: int | None = Field(default=None, description="Total steps for the day.")
-    calories_total: float | None = Field(default=None, description="Total calories burned for the day.")
+    calendar_date: date = Field(
+        ..., description="Primary key (per user). The calendar day."
+    )
 
+    # ── Sleep ──────────────────────────────────────────────
+    sleep_score: float | None = Field(
+        default=None, description="Vendor-computed overall sleep score."
+    )
+    sleep_start_time: datetime | None = Field(
+        default=None, description="Sleep onset timestamp."
+    )
+    sleep_end_time: datetime | None = Field(
+        default=None, description="Sleep end (wake) timestamp."
+    )
+    sleep_duration_seconds: int | None = Field(
+        default=None, description="Total time in bed (seconds)."
+    )
+    deep_sleep_seconds: int | None = Field(
+        default=None, description="Time in deep/N3 sleep (seconds)."
+    )
+    light_sleep_seconds: int | None = Field(
+        default=None, description="Time in light/N1+N2 sleep (seconds)."
+    )
+    rem_sleep_seconds: int | None = Field(
+        default=None, description="Time in REM sleep (seconds)."
+    )
+    awake_seconds: int | None = Field(
+        default=None,
+        description="Time awake during sleep window (seconds).",
+    )
+    avg_overnight_hr: float | None = Field(
+        default=None, description="Average HR during sleep (bpm)."
+    )
+    avg_overnight_hrv: float | None = Field(
+        default=None,
+        description=(
+            "Average HRV during sleep (ms), if available from "
+            "sleep HRV monitoring."
+        ),
+    )
+
+    # ── Readiness & recovery ───────────────────────────────
+    resting_hr: float | None = Field(
+        default=None, description="Resting heart rate (bpm)."
+    )
+    resting_hr_7day_avg: float | None = Field(
+        default=None,
+        description=(
+            "7-day rolling average resting HR (bpm). "
+            "Trend is more informative than the daily value."
+        ),
+    )
+    hrv_status: HrvStatus | None = Field(
+        default=None, description="HRV readiness status (enum)."
+    )
+    hrv_weekly_avg: float | None = Field(
+        default=None, description="7-day average HRV (ms)."
+    )
+    body_battery_high: int | None = Field(
+        default=None,
+        description="Peak body battery value for the day (0–100).",
+    )
+    body_battery_low: int | None = Field(
+        default=None,
+        description="Lowest body battery value for the day (0–100).",
+    )
+    avg_stress_level: float | None = Field(
+        default=None, description="Average stress level (0–100 scale)."
+    )
+    max_stress_level: float | None = Field(
+        default=None, description="Peak stress level for the day."
+    )
+    training_status: TrainingStatus | None = Field(
+        default=None, description="Training status assessment (enum)."
+    )
+    training_load_balance: float | None = Field(
+        default=None,
+        description=(
+            "Ratio of acute to chronic training load. "
+            "Values >1 indicate increasing load; <1 recovery."
+        ),
+    )
+    vo2max_running: float | None = Field(
+        default=None,
+        description="Estimated running VO2max (mL/kg/min).",
+    )
+
+    # ── Body metrics ───────────────────────────────────────
+    avg_spo2: float | None = Field(
+        default=None,
+        description="Average blood oxygen saturation (%).",
+    )
+    lowest_spo2: float | None = Field(
+        default=None, description="Lowest SpO2 reading (%)."
+    )
+    avg_respiration_waking: float | None = Field(
+        default=None,
+        description="Average waking respiration rate (breaths/min).",
+    )
+    avg_respiration_sleep: float | None = Field(
+        default=None,
+        description="Average sleeping respiration rate (breaths/min).",
+    )
+    steps: int | None = Field(
+        default=None, description="Total step count for the day."
+    )
+    calories_active: float | None = Field(
+        default=None, description="Active calories burned."
+    )
+    calories_total: float | None = Field(
+        default=None, description="Total calories (active + BMR)."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Silver Layer — Workout Definitions & Calendar
+# ---------------------------------------------------------------------------
 
 class WorkoutStep(BaseModel):
-    """A single structured step within a workout definition (e.g. '5x800m @ Threshold')."""
+    """A single step within a structured workout definition.
 
-    step_order: int = Field(..., description="1-based position of this step within the workout.")
-    step_type: str = Field(..., description="e.g. 'warmup', 'interval', 'recovery', 'cooldown', 'rest', 'other'.")
-    duration_type: str | None = Field(default=None, description="e.g. 'time', 'distance', 'open'.")
-    duration_value: float | None = Field(default=None, description="Duration magnitude, in seconds or meters.")
-    target_type: str | None = Field(default=None, description="e.g. 'heart_rate', 'pace', 'power', 'open'.")
-    target_low: float | None = Field(default=None, description="Lower bound of the target range.")
-    target_high: float | None = Field(default=None, description="Upper bound of the target range.")
+    Supports recursive repeat structure: a step with
+    ``step_type == StepType.REPEAT`` has a ``repeat_count`` and nested
+    ``children`` steps (e.g. "5× { 800 m @ threshold, 400 m jog }").
+    Leaf steps (warmup, interval, recovery, cooldown) have ``children == []``.
+    """
+
+    step_order: int = Field(
+        ...,
+        description="1-based position of this step within its parent.",
+    )
+    step_type: StepType = Field(..., description="Step type (enum).")
+    duration_type: DurationType | None = Field(
+        default=None,
+        description="How the step ends (time, distance, open).",
+    )
+    duration_value: float | None = Field(
+        default=None,
+        description=(
+            "Duration magnitude. Seconds for TIME, meters for DISTANCE."
+        ),
+    )
+    target_type: TargetType | None = Field(
+        default=None,
+        description="Target metric (HR, pace, power, open).",
+    )
+    target_low: float | None = Field(
+        default=None, description="Lower bound of the target range."
+    )
+    target_high: float | None = Field(
+        default=None, description="Upper bound of the target range."
+    )
+    repeat_count: int | None = Field(
+        default=None,
+        description=(
+            "For REPEAT steps: how many times to execute the children. "
+            "None for non-repeat steps."
+        ),
+    )
+    children: list[WorkoutStep] = Field(
+        default_factory=list,
+        description="Nested steps within a repeat group. Empty for leaf steps.",
+    )
 
 
 class SilverWorkoutDefinition(SilverRecordBase):
-    """
-    Structured workout definition (steps/targets), sourced from vendor workout FIT files.
-    Distinct from the calendar assignment (see `SilverWorkoutCalendar`) per architecture
-    §6: the definition is device/plan-recorded structure; the calendar is JSON-only
-    scheduling metadata that references a definition by `workout_id`.
+    """Structured workout definition (steps/targets).
+
+    Sourced from vendor workout FIT files.  Distinct from the calendar
+    assignment (``SilverWorkoutCalendar``): the definition is device/plan-
+    recorded structure; the calendar is JSON-only scheduling metadata.
     """
 
-    workout_id: str = Field(..., description="Primary key. Vendor's unique workout definition identifier.")
-    workout_title: str = Field(..., description="Human-readable workout name.")
-    sport_type: str | None = Field(default=None, description="e.g. 'running', 'cycling'.")
-    steps: list[WorkoutStep] = Field(default_factory=list, description="Ordered structured steps for this workout.")
+    workout_id: str = Field(
+        ...,
+        description="Primary key. Vendor's unique workout definition identifier.",
+    )
+    workout_title: str = Field(
+        ..., description="Human-readable workout name."
+    )
+    sport_type: SportType | None = Field(
+        default=None, description="Target sport type (enum)."
+    )
+    estimated_duration_seconds: float | None = Field(
+        default=None,
+        description="Estimated total workout duration in seconds.",
+    )
+    estimated_distance_meters: float | None = Field(
+        default=None,
+        description="Estimated total workout distance in meters.",
+    )
+    description: str | None = Field(
+        default=None, description="Workout description / notes."
+    )
+    steps: list[WorkoutStep] = Field(
+        default_factory=list,
+        description="Ordered, possibly nested, structured steps.",
+    )
 
 
 class SilverWorkoutCalendar(SilverRecordBase):
-    """
-    Scheduled workout calendar entry: which workout (if any) is assigned on which date.
-    JSON-only since calendar assignment isn't device-recorded.
+    """Scheduled workout calendar entry.
+
+    Which workout is assigned on which date.  JSON-only since calendar
+    assignment is not device-recorded.
     """
 
-    calendar_date: date = Field(..., description="Primary key (per user).")
+    calendar_date: date = Field(
+        ..., description="Primary key (per user). Scheduled date."
+    )
     workout_id: str | None = Field(
         default=None,
-        description="FK to SilverWorkoutDefinition.workout_id; None for an ad-hoc/unstructured entry.",
+        description=(
+            "FK to SilverWorkoutDefinition.workout_id; "
+            "None for ad-hoc entries."
+        ),
     )
-    workout_title: str | None = Field(default=None, description="Human-readable workout name.")
-    sport_type: str | None = Field(default=None, description="e.g. 'running', 'cycling'.")
-    status: str | None = Field(default=None, description="e.g. 'scheduled', 'completed', 'skipped'.")
-
+    workout_title: str | None = Field(
+        default=None, description="Human-readable workout name."
+    )
+    sport_type: SportType | None = Field(
+        default=None, description="Target sport type (enum)."
+    )
+    status: str | None = Field(
+        default=None,
+        description="e.g. 'scheduled', 'completed', 'skipped'.",
+    )
+    training_plan_id: str | None = Field(
+        default=None,
+        description=(
+            "Garmin ATP plan id, if this workout belongs to a formal "
+            "training plan.  Lets the agent distinguish 'following a 10K "
+            "plan' from 'coach-created workouts'."
+        ),
+    )

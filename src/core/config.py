@@ -102,6 +102,12 @@ class RateLimitSettings(BaseModel):
     retry_attempts: int = Field(
         default=3, description="Transient network/5xx retries per request (passed to garminconnect)."
     )
+    retry_min_wait_seconds: float = Field(
+        default=1.0, description="Initial backoff before a retry (passed to garminconnect; grows exponentially)."
+    )
+    retry_max_wait_seconds: float = Field(
+        default=10.0, description="Upper bound on retry backoff (passed to garminconnect)."
+    )
     login_cooldown_seconds: float = Field(
         default=3600.0,
         description=(

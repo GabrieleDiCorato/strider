@@ -18,18 +18,23 @@ token-cache short-circuiting:
    elapses, instead of retrying and risking a longer ban.
 
 Data-fetching methods are intentionally NOT wrapped here — this module only
-owns authentication. Bronze payload retrieval belongs to future ingestion
-pipeline code that consumes an already-authenticated client.
+owns authentication. Bronze payload retrieval is `ingestion.garmin.connector`'s
+job, which consumes a client this module has already authenticated.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from garminconnect import Garmin, GarminConnectTooManyRequestsError
+from garminconnect import (
+    Garmin,
+    GarminConnectAuthenticationError,
+    GarminConnectConnectionError,
+    GarminConnectTooManyRequestsError,
+)
 
 from src.core.config import Settings
 from src.core.schemas import GarminAccountLink
@@ -48,8 +53,17 @@ class GarminAuthCooldownError(RuntimeError):
     clear.
     """
 
+    def __init__(self, message: str, *, retry_after_seconds: float) -> None:
+        super().__init__(message)
+        # Lets callers (e.g. a scheduler) reschedule programmatically instead
+        # of parsing the message string.
+        self.retry_after_seconds = retry_after_seconds
+
 
 def _cooldown_marker_path(settings: Settings) -> Path:
+    """Return the path to the persisted login cooldown marker file."""
+    if settings.garmin.tokenstore_path is None:
+        raise RuntimeError("Garmin tokenstore path is not configured.")
     return Path(settings.garmin.tokenstore_path).expanduser() / _COOLDOWN_FILENAME
 
 
@@ -86,6 +100,8 @@ def build_client(settings: Settings) -> Garmin:
         password=settings.garmin.password.get_secret_value(),
         is_cn=settings.garmin.is_cn,
         retry_attempts=settings.rate_limit.retry_attempts,
+        retry_min_wait=settings.rate_limit.retry_min_wait_seconds,
+        retry_max_wait=settings.rate_limit.retry_max_wait_seconds,
         prompt_mfa=lambda: input("Enter Garmin MFA code: "),
     )
 
@@ -100,6 +116,10 @@ def login(client: Garmin, settings: Settings, *, force: bool = False) -> Garmin:
     :param force: Bypass both the in-process and cooldown guards. Only use
         this once you have manually confirmed Garmin's rate limit has cleared.
     :raises GarminAuthCooldownError: A cooldown from a prior 429 is still active.
+    :raises GarminConnectAuthenticationError: Credentials were rejected (not
+        a rate-limit condition — no cooldown is recorded).
+    :raises GarminConnectConnectionError: Transient network/DNS/TLS failure
+        reaching Garmin, after the library's own retry budget is exhausted.
     :raises GarminConnectTooManyRequestsError: Garmin rate-limited this attempt.
     """
     if not force and client.client.is_authenticated:
@@ -117,24 +137,28 @@ def login(client: Garmin, settings: Settings, *, force: bool = False) -> Garmin:
                 raise GarminAuthCooldownError(
                     f"Login is on cooldown for another {remaining:.0f}s ({reason}). "
                     f"Cooldown recorded at {cooldown_path}. Pass force=True once you've "
-                    "confirmed Garmin's rate limit has cleared, or delete that file."
+                    "confirmed Garmin's rate limit has cleared, or delete that file.",
+                    retry_after_seconds=remaining,
                 )
 
-    settings.garmin.tokenstore_path.mkdir(parents=True, exist_ok=True)
+    settings.garmin.tokenstore_path.mkdir(parents=True, exist_ok=True)  # type: ignore[union-attr]
     try:
         client.login(str(settings.garmin.tokenstore_path))
     except GarminConnectTooManyRequestsError as e:
-        blocked_until = datetime.now(timezone.utc).timestamp() + settings.rate_limit.login_cooldown_seconds
-        _write_cooldown(
-            cooldown_path,
-            datetime.fromtimestamp(blocked_until, tz=timezone.utc),
-            reason=str(e),
-        )
+        blocked_until = datetime.now(timezone.utc) + timedelta(seconds=settings.rate_limit.login_cooldown_seconds)
+        _write_cooldown(cooldown_path, blocked_until, reason=str(e))
         logger.error(
             "Garmin rate-limited this login attempt; cooldown set for %.0fs at %s.",
             settings.rate_limit.login_cooldown_seconds,
             cooldown_path,
         )
+        raise
+    except GarminConnectAuthenticationError:
+        # Not a rate-limit condition: bad credentials won't be fixed by waiting, so no cooldown.
+        logger.error("Garmin rejected the configured credentials (check GARMIN__EMAIL/GARMIN__PASSWORD).")
+        raise
+    except GarminConnectConnectionError as e:
+        logger.error("Connection to Garmin Connect failed after retries: %s", e)
         raise
     else:
         # A successful login means any earlier cooldown no longer applies.
