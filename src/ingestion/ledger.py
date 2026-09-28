@@ -93,3 +93,15 @@ class SyncLedger:
                     file_path=row[6]
                 ))
             return entries
+
+    def find_payload_path(self, user_id: str, entity_type: str, source_identifier: str) -> str | None:
+        """Newest Bronze file path for this entity across all vendors, or None."""
+        with duckdb.connect(self.db_path) as conn:
+            result = conn.execute("""
+                SELECT file_path FROM sync_ledger
+                WHERE user_id = ? AND entity_type = ? AND source_identifier = ?
+                ORDER BY fetch_timestamp DESC LIMIT 1
+            """, [user_id, entity_type, source_identifier]).fetchone()
+            if result:
+                return result[0]
+            return None

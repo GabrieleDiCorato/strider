@@ -38,3 +38,20 @@ def test_fetch_timestamp_round_trips_through_non_utc_input(tmp_path: Path) -> No
     [entry] = ledger.get_entries("athlete-1", "garmin", EntityType.ACTIVITY.value)
     assert entry.fetch_timestamp == fetch_timestamp
     assert ledger.is_already_ingested("athlete-1", "garmin", EntityType.ACTIVITY.value, "activity-1", "hash-1")
+
+
+def test_find_payload_path(tmp_path: Path) -> None:
+    ledger = SyncLedger(tmp_path / "ledger.duckdb")
+    fetch_time = datetime(2026, 9, 28, 12, 0, tzinfo=timezone.utc)
+    
+    assert ledger.find_payload_path("athlete-1", EntityType.ACTIVITY.value, "act-1") is None
+    
+    entry = _entry(fetch_time)
+    entry.source_identifier = "act-1"
+    entry.file_path = "/tmp/act-1.zip"
+    ledger.record_ingestion(entry)
+    
+    assert ledger.find_payload_path("athlete-1", EntityType.ACTIVITY.value, "act-1") == "/tmp/act-1.zip"
+    
+    assert ledger.find_payload_path("athlete-2", EntityType.ACTIVITY.value, "act-1") is None
+    assert ledger.find_payload_path("athlete-1", EntityType.ACTIVITY.value, "act-2") is None

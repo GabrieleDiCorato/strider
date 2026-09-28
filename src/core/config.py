@@ -131,6 +131,12 @@ class RateLimitSettings(BaseModel):
         ),
     )
 
+class LlmSettings(BaseModel):
+    model: str = "gemini-2.5-flash"
+    api_key: SecretStr | None = None
+    temperature: float = Field(default=0.2, ge=0.0, le=1.0)
+    max_output_tokens: int = Field(default=1024, ge=128, le=8192)
+
 
 class Settings(BaseSettings):
     """Root application settings, populated from environment variables and `.env`."""
@@ -155,6 +161,7 @@ class Settings(BaseSettings):
     garmin: GarminSettings
     data: DataPathSettings = Field(default_factory=DataPathSettings)
     rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
+    llm: LlmSettings = Field(default_factory=LlmSettings)
 
     def model_post_init(self, __context: Any) -> None:
         if self.garmin.tokenstore_path is None:

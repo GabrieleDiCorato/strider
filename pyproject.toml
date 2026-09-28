@@ -9,6 +9,7 @@ dependencies = [
     "fastapi>=0.141.1",
     "fitdecode>=0.11.0",
     "garminconnect>=0.3.16",
+    "google-adk>=2.10.0",
     "pandera>=0.33.1",
     "polars>=1.44.2",
     "pydantic>=2.13.5",
