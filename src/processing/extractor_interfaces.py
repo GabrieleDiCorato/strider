@@ -100,11 +100,21 @@ class Writer(Protocol[SilverT]):
     Silver partition path.
     """
 
-    def write(self, records: list[SilverT], entity_type: EntityType) -> None:
+    def write(
+        self,
+        records: list[SilverT],
+        entity_type: EntityType,
+        *,
+        replace_partitions: set[tuple[str, int, int]] | None = None,
+    ) -> None:
         """Write validated Silver records to partitioned Parquet.
 
         :param records: Typed Silver Pydantic model instances.
         :param entity_type: Determines the Parquet partition path
             (``silver/{entity_type}/user_id=.../year=.../...``).
+        :param replace_partitions: Optional complete partition scopes to
+            replace, expressed as ``(user_id, year, month)``. Used when a
+            source payload represents a complete partition, such as a monthly
+            workout calendar that may no longer contain previously seen rows.
         """
         ...
