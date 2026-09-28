@@ -22,9 +22,9 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, StringConstraints
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +123,19 @@ basic_config = ConfigDict(
     frozen=True
     )
 
+# A `user_id` is embedded literally (never percent-encoded) into Bronze/Silver
+# file paths and Hive partition segments (`user_id=...`), and DuckDB's
+# `hive_partitioning` reader reconstructs it from that raw path segment. For
+# that round-trip to be lossless and filesystem/URL safe, every `user_id`
+# everywhere in the system is constrained to this charset at construction
+# time — this is the single source of truth, not a check duplicated at each
+# storage boundary.
+UserId = Annotated[
+    str,
+    StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"),
+]
+
+
 # ---------------------------------------------------------------------------
 # Identity (Strider users <-> linked vendor accounts)
 # ---------------------------------------------------------------------------
@@ -135,7 +148,7 @@ class User(BaseModel):
     as a foreign key; this model itself never stores vendor credentials.
     """
 
-    user_id: str = Field(
+    user_id: UserId = Field(
         ..., description="Primary key. Strider's internal user identifier."
     )
     display_name: str | None = Field(
@@ -153,7 +166,7 @@ class GarminAccountLink(BaseModel):
     ``core.config.GarminSettings``, sourced from ``.env``.
     """
 
-    user_id: str = Field(..., description="FK to User.user_id.")
+    user_id: UserId = Field(..., description="FK to User.user_id.")
     email: str = Field(
         ..., description="Garmin Connect login email for this account."
     )
@@ -182,7 +195,7 @@ class BronzeLedgerEntry(BaseModel):
     free-form string.
     """
 
-    user_id: str = Field(
+    user_id: UserId = Field(
         ..., description="FK to User.user_id (not a vendor account id)."
     )
     vendor: str = Field(..., description="Vendor name, e.g. 'garmin'.")
@@ -220,7 +233,7 @@ class SilverRecordBase(BaseModel):
     (e.g. ``activity_id``, ``calendar_date``).
     """
 
-    user_id: str = Field(
+    user_id: UserId = Field(
         ..., description="FK to User.user_id (not a vendor account id)."
     )
     updated_at: datetime = Field(

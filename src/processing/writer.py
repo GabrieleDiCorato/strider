@@ -7,7 +7,6 @@ from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, unquote
 from uuid import uuid4
 
 import polars as pl
@@ -190,12 +189,14 @@ def _record_partition(
 def _partition_dir(
     silver_dir: Path, entity_type: EntityType, partition: tuple[str, int, int]
 ) -> Path:
+    # `user_id` is schema-validated (`core.schemas.UserId`) to a filesystem/URL-safe
+    # charset, so it's embedded literally here — no percent-encoding round-trip to
+    # keep in sync with DuckDB's raw `hive_partitioning` segment parsing.
     user_id, year, month = partition
-    encoded_user = quote(user_id, safe="-_.~")
     return (
         silver_dir
         / entity_type.value
-        / f"user_id={encoded_user}"
+        / f"user_id={user_id}"
         / f"year={year:04d}"
         / f"month={month:02d}"
     )
@@ -216,7 +217,7 @@ def _partition_files(
         if not {"user_id", "year", "month"}.issubset(values):
             continue
         partition = (
-            unquote(values["user_id"]),
+            values["user_id"],
             int(values["year"]),
             int(values["month"]),
         )

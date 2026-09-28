@@ -23,6 +23,8 @@ from typing import Any
 from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from src.core.schemas import UserId
+
 # Repository root, resolved from this file's location (src/core/config.py).
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -77,6 +79,14 @@ class DataPathSettings(BaseModel):
         default=None,
         description="DuckDB file tracking ingestion idempotency (hash/updated_at per entity).",
     )
+    gold_db_path: Path | None = Field(
+        default=None,
+        description=(
+            "DuckDB catalog file storing Gold-layer view definitions over the Silver "
+            "Parquet directories. Stores only view SQL text, never row data. Defaults to "
+            "`<root_dir>/gold.duckdb`."
+        ),
+    )
     memory_db_path: Path | None = Field(
         default=None, description="Agent long-term semantic memory store. Defaults to `<root_dir>/memory.db`."
     )
@@ -88,6 +98,8 @@ class DataPathSettings(BaseModel):
             self.silver_dir = self.root_dir / "silver"
         if self.ledger_db_path is None:
             self.ledger_db_path = self.root_dir / "ledger.duckdb"
+        if self.gold_db_path is None:
+            self.gold_db_path = self.root_dir / "gold.duckdb"
         if self.memory_db_path is None:
             self.memory_db_path = self.root_dir / "memory.db"
 
@@ -130,7 +142,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    user_id: str = Field(
+    user_id: UserId = Field(
         ...,
         description=(
             "Stable identifier for the athlete this local instance serves. Required (not "

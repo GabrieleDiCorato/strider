@@ -4,6 +4,7 @@ from typing import List
 import duckdb
 
 from src.core.config import get_settings
+from src.core.duckdb_utils import from_utc_naive, to_utc_naive
 from src.core.schemas import BronzeLedgerEntry
 
 
@@ -65,7 +66,7 @@ class SyncLedger:
                 entry.entity_type,
                 entry.source_identifier,
                 entry.content_hash,
-                entry.fetch_timestamp,
+                to_utc_naive(entry.fetch_timestamp),
                 entry.file_path
             ])
             
@@ -88,7 +89,7 @@ class SyncLedger:
                     entity_type=row[2],
                     source_identifier=row[3],
                     content_hash=row[4],
-                    fetch_timestamp=row[5],
+                    fetch_timestamp=from_utc_naive(row[5]),
                     file_path=row[6]
                 ))
             return entries
