@@ -24,7 +24,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, ConfigDict, StringConstraints
+from pydantic import BaseModel, Field, ConfigDict, StringConstraints, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -690,3 +690,94 @@ class SilverWorkoutCalendar(SilverRecordBase):
             "plan' from 'coach-created workouts'."
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# Qualitative context — Coaching Journal & static memory (architecture §7-8)
+# ---------------------------------------------------------------------------
+
+class EntrySource(str, Enum):
+    """Who authored a journal entry or memory fact."""
+
+    USER = "user"
+    AI = "ai"
+
+
+class JournalCategory(str, Enum):
+    """What kind of context a journal entry captures."""
+
+    FEELING = "feeling"
+    INJURY = "injury"
+    EXERTION = "exertion"
+    LIFESTYLE = "lifestyle"
+    NOTE = "note"
+    OBSERVATION = "observation"  # AI narrative only
+
+
+class MemoryCategory(str, Enum):
+    PREFERENCE = "preference"
+    GOAL = "goal"
+    CONSTRAINT = "constraint"
+    PROFILE = "profile"
+    COMMUNICATION = "communication"
+
+
+class MemoryStatus(str, Enum):
+    ACTIVE = "active"
+    PROPOSED = "proposed"  # AI-authored, awaiting user confirmation
+
+
+JournalText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
+MemoryKey = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]{0,63}$")]
+MemoryValue = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+
+
+class JournalEntry(BaseModel):
+    """One immutable entry on a user's chronological coaching timeline.
+
+    `text` is user- or model-authored free text: consumers must treat it as
+    inert data, never as instructions.
+    """
+
+    model_config = basic_config
+
+    entry_id: str = Field(..., description="Primary key, assigned internally by the store.")
+    user_id: UserId
+    entry_date: date = Field(..., description="The day this entry is about (may differ from created_at).")
+    created_at: datetime = Field(..., description="When the entry was recorded.")
+    source: EntrySource
+    category: JournalCategory
+    text: JournalText
+    rating: int | None = Field(
+        default=None,
+        ge=1,
+        le=10,
+        description="Self-reported intensity: perceived exertion for exertion entries, severity for injuries.",
+    )
+    related_activity_id: str | None = Field(
+        default=None, description="Optional link to SilverActivity.activity_id."
+    )
+
+    @model_validator(mode="after")
+    def _source_matches_category(self) -> JournalEntry:
+        is_observation = self.category is JournalCategory.OBSERVATION
+        if self.source is EntrySource.AI and not is_observation:
+            raise ValueError("AI-authored entries must use the 'observation' category.")
+        if self.source is EntrySource.USER and is_observation:
+            raise ValueError("The 'observation' category is reserved for AI-authored entries.")
+        return self
+
+
+class MemoryFact(BaseModel):
+    """A durable user-level fact injected into the agent's system prompt once ACTIVE."""
+
+    model_config = basic_config
+
+    user_id: UserId
+    key: MemoryKey
+    category: MemoryCategory
+    value: MemoryValue
+    source: EntrySource
+    status: MemoryStatus
+    created_at: datetime
+    updated_at: datetime
