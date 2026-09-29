@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/journal", tags=["journal"])
 class ManualLogRequest(BaseModel):
     category: JournalCategory
     text: str
+    entry_date: Optional[date] = None
     rating: Optional[int] = None
     related_activity_id: Optional[str] = None
 
@@ -46,7 +47,7 @@ async def add_manual_log(
     
     entry = journal.add_entry(
         user_id=settings.user_id,
-        entry_date=today,
+        entry_date=req.entry_date or today,
         source=EntrySource.USER,
         category=req.category,
         text=req.text,

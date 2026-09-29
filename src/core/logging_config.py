@@ -11,12 +11,29 @@ def setup_logging(level: int = logging.INFO) -> None:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # Root logger handler
+    # Root logger handlers
     root_logger = logging.getLogger()
     if not root_logger.handlers:
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(formatter)
-        root_logger.addHandler(handler)
+        # Console handler
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
+        root_logger.addHandler(console_handler)
+        
+        # File handler
+        from pathlib import Path
+        from logging.handlers import RotatingFileHandler
+        from src.core.config import REPO_ROOT
+        
+        log_dir = REPO_ROOT / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        file_handler = RotatingFileHandler(
+            filename=log_dir / "strider.log",
+            maxBytes=10 * 1024 * 1024,  # 10 MB
+            backupCount=5,
+            encoding="utf-8"
+        )
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
     else:
         for handler in root_logger.handlers:
             handler.setFormatter(formatter)

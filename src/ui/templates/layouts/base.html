@@ -155,6 +155,8 @@
 <body>
     {% block body %}{% endblock %}
     
+    <div id="toast-container" style="position: fixed; bottom: var(--space-4); right: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); z-index: 9999;"></div>
+
     <script>
         function toggleTheme() {
             var html = document.documentElement;
@@ -163,6 +165,76 @@
             html.setAttribute('data-theme', next);
             document.cookie = "strider_theme=" + next + "; Path=/; Max-Age=31536000; SameSite=Lax";
         }
+
+        function showToast(message, isError=false) {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.style.padding = 'var(--space-3) var(--space-4)';
+            toast.style.borderRadius = 'var(--radius-md)';
+            toast.style.color = '#fff';
+            toast.style.backgroundColor = isError ? 'var(--color-status-danger)' : 'var(--color-brand-primary)';
+            toast.style.boxShadow = 'var(--shadow-lg)';
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity var(--transition-normal)';
+            toast.style.maxWidth = '400px';
+            toast.style.wordBreak = 'break-word';
+            toast.innerText = message;
+            
+            container.appendChild(toast);
+            
+            requestAnimationFrame(() => toast.style.opacity = '1');
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
+
+        // Intercept global fetch calls for manual JS forms
+        const originalFetch = window.fetch;
+        window.fetch = async function(...args) {
+            try {
+                const response = await originalFetch(...args);
+                if (!response.ok) {
+                    let errorMsg = `Error ${response.status}: ${response.statusText}`;
+                    try {
+                        const errBody = await response.clone().json();
+                        if (errBody.detail) {
+                            if (Array.isArray(errBody.detail)) {
+                                errorMsg += " - " + errBody.detail.map(e => e.msg).join(", ");
+                            } else {
+                                errorMsg += " - " + errBody.detail;
+                            }
+                        }
+                    } catch(e) {}
+                    showToast(errorMsg, true);
+                }
+                return response;
+            } catch (error) {
+                showToast(`Network Error: ${error.message}`, true);
+                throw error;
+            }
+        };
+
+        // Intercept HTMX errors
+        document.body.addEventListener('htmx:responseError', function(evt) {
+            let errorMsg = `HTMX Error ${evt.detail.xhr.status}: ${evt.detail.xhr.statusText}`;
+            try {
+                const errBody = JSON.parse(evt.detail.xhr.response);
+                if (errBody.detail) {
+                    if (Array.isArray(errBody.detail)) {
+                        errorMsg += " - " + errBody.detail.map(e => e.msg).join(", ");
+                    } else {
+                        errorMsg += " - " + errBody.detail;
+                    }
+                }
+            } catch(e) {}
+            showToast(errorMsg, true);
+        });
+        document.body.addEventListener('htmx:sendError', function(evt) {
+            showToast(`HTMX Network Error`, true);
+        });
     </script>
 </body>
 </html>

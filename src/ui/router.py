@@ -95,7 +95,7 @@ async def journal_page(
     
     categories = None
     if category:
-        categories = [JournalCategory(c) for c in category.split(",")]
+        categories = [JournalCategory(c.lower()) for c in category.split(",")]
         
     entries = journal.list_entries(
         settings.user_id,

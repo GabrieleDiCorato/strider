@@ -52,24 +52,29 @@
             " style="display: flex; flex-direction: column; gap: var(--space-4);">
                 
                 <label>
+                    <span style="display: block; margin-bottom: var(--space-1); font-weight: var(--weight-medium); font-size: var(--text-sm);">Date</span>
+                    <input type="date" name="entry_date" required value="{{ current_date }}" style="box-sizing: border-box; padding: var(--space-2); width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary); margin-bottom: var(--space-4);">
+                </label>
+
+                <label>
                     <span style="display: block; margin-bottom: var(--space-1); font-weight: var(--weight-medium); font-size: var(--text-sm);">Category</span>
-                    <select name="category" required style="padding: var(--space-2); width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary);">
-                        <option value="FEELING">Feeling</option>
-                        <option value="INJURY">Injury</option>
-                        <option value="EXERTION">Exertion</option>
-                        <option value="LIFESTYLE">Lifestyle</option>
-                        <option value="NOTE">Note</option>
+                    <select name="category" required style="box-sizing: border-box; padding: var(--space-2); width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary);">
+                        <option value="feeling">Feeling</option>
+                        <option value="injury">Injury</option>
+                        <option value="exertion">Exertion</option>
+                        <option value="lifestyle">Lifestyle</option>
+                        <option value="note">Note</option>
                     </select>
                 </label>
                 
                 <label>
-                    <span style="display: block; margin-bottom: var(--space-1); font-weight: var(--weight-medium); font-size: var(--text-sm);">Rating (1-10)</span>
-                    <input type="number" name="rating" min="1" max="10" style="padding: var(--space-2); width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary);">
+                    <span style="display: block; margin-bottom: var(--space-1); font-weight: var(--weight-medium); font-size: var(--text-sm);">Rating (1-10) <span class="text-muted" style="font-weight: normal;">(1=light, 10=severe/max)</span></span>
+                    <input type="number" name="rating" min="1" max="10" style="box-sizing: border-box; padding: var(--space-2); width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary);">
                 </label>
                 
                 <label>
                     <span style="display: block; margin-bottom: var(--space-1); font-weight: var(--weight-medium); font-size: var(--text-sm);">Text</span>
-                    <textarea name="text" required rows="4" style="padding: var(--space-2); width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary); resize: vertical;"></textarea>
+                    <textarea name="text" required rows="4" style="box-sizing: border-box; padding: var(--space-2); width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary); resize: vertical;"></textarea>
                 </label>
                 
                 <button type="submit" class="btn btn--primary">Save to Journal</button>
@@ -77,31 +82,37 @@
         </div>
         
         <div class="card" style="margin-top: var(--space-4);">
-            <h3 style="margin-bottom: var(--space-2);">Quick Capture</h3>
+            <h3 style="margin-bottom: var(--space-2);">AI Smart Log</h3>
             <p class="text-muted" style="font-size: var(--text-sm); margin-bottom: var(--space-4);">Frictionless logging for nutrition and notes.</p>
             
-            <form onsubmit="
-                event.preventDefault();
-                const formData = new FormData(this);
-                const data = Object.fromEntries(formData.entries());
-                
-                document.getElementById('qc-preview').innerHTML = '<div class=\'text-muted\'>Parsing...</div>';
-                
-                fetch('/api/journal/quick-capture/parse', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
-                }).then(r => r.json()).then(res => {
-                    document.getElementById('qc-preview').innerHTML = '<div>Parsed item. <button type=\'button\' class=\'btn btn--primary btn--sm\' style=\'margin-top: 8px;\' onclick=\'confirmQC(\"' + res.text + '\")\'>Confirm & Save</button></div>';
-                });
-            ">
-                <textarea name="text" required rows="2" placeholder="e.g., 2 bowls of oatmeal..." style="padding: var(--space-2); width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary); margin-bottom: var(--space-2);"></textarea>
-                <button type="submit" class="btn btn--secondary" style="width: 100%;">Parse</button>
+            <form id="qc-form">
+                <textarea name="text" required rows="2" placeholder="e.g., 2 bowls of oatmeal..." style="box-sizing: border-box; padding: var(--space-2); width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary); margin-bottom: var(--space-2);"></textarea>
+                <button type="submit" class="btn btn--secondary" style="width: 100%;">Analyze</button>
             </form>
             
             <div id="qc-preview" style="margin-top: var(--space-4); font-size: var(--text-sm);"></div>
             
             <script>
+                document.getElementById('qc-form').addEventListener('submit', function(event) {
+                    event.preventDefault();
+                    const formData = new FormData(this);
+                    const data = Object.fromEntries(formData.entries());
+                    
+                    const preview = document.getElementById('qc-preview');
+                    preview.innerHTML = '<div class="text-muted">Analyzing...</div>';
+                    
+                    fetch('/api/journal/quick-capture/parse', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(data)
+                    }).then(r => r.json()).then(res => {
+                        preview.innerHTML = '<div>This is a placeholder (AI parsing not wired up yet).<br><button type="button" class="btn btn--primary btn--sm" style="margin-top: 8px;" id="qc-confirm-btn">Confirm & Save</button></div>';
+                        document.getElementById('qc-confirm-btn').addEventListener('click', function() {
+                            confirmQC(res.text);
+                        });
+                    });
+                });
+
                 function confirmQC(text) {
                     fetch('/api/journal/quick-capture/confirm', {
                         method: 'POST',
