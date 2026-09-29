@@ -92,7 +92,7 @@ class ReadinessSnapshot(BaseModel):
     avg_stress_level: float | None
     training_status: TrainingStatus | None
     vo2max: float | None = None
-
+    
 
 class WellnessAverages(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -126,4 +126,3 @@ class MemoryBrief(BaseModel):
     category: MemoryCategory
     key: str
     value: str
-
