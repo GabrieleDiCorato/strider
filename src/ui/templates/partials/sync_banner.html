@@ -1,0 +1,17 @@
+<div id="sync-banner" style="display: flex; align-items: center; gap: var(--space-2);">
+    {% if status == "success" %}
+        <span class="badge" style="background-color: var(--color-status-good-bg); color: var(--color-status-good-text); border: 1px solid var(--color-status-good-border);">
+            ✓ Synced ({{ total_count }} records)
+        </span>
+    {% elif status == "error" %}
+        <span class="badge" style="background-color: var(--color-status-danger-bg); color: var(--color-status-danger-text); border: 1px solid var(--color-status-danger-border);" title="{{ error_message }}">
+            ⚠ Sync Failed
+        </span>
+    {% endif %}
+    <form hx-post="/api/sync" hx-target="#sync-banner" hx-swap="outerHTML" hx-indicator="#sync-spinner">
+        <button class="btn btn--secondary" type="submit" id="sync-btn" style="position: relative;">
+            <span id="sync-text">Sync Garmin</span>
+            <span id="sync-spinner" class="htmx-indicator" style="margin-left: var(--space-2);">⏳ Syncing...</span>
+        </button>
+    </form>
+</div>

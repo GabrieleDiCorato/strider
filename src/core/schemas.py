@@ -308,6 +308,9 @@ class SilverActivity(SilverRecordBase):
     activity_id: str = Field(
         ..., description="Primary key. Vendor's unique activity identifier."
     )
+    activity_name: str | None = Field(
+        default=None, description="User-friendly name of the activity."
+    )
     sport_type: SportType = Field(
         ..., description="Canonical sport type (enum)."
     )
@@ -520,6 +523,18 @@ class SilverDailySummary(SilverRecordBase):
     body_battery_low: int | None = Field(
         default=None,
         description="Lowest body battery value for the day (0–100).",
+    )
+    body_battery_charged: int | None = Field(
+        default=None,
+        description="Amount of body battery charged during the day.",
+    )
+    body_battery_drained: int | None = Field(
+        default=None,
+        description="Amount of body battery drained during the day.",
+    )
+    body_battery_current: int | None = Field(
+        default=None,
+        description="Most recent body battery value.",
     )
     avg_stress_level: float | None = Field(
         default=None, description="Average stress level (0–100 scale)."

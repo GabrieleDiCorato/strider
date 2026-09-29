@@ -1,0 +1,97 @@
+{% extends "layouts/app_layout.html" %}
+
+{% block content %}
+{% if activity %}
+<div class="card" style="margin-bottom: var(--space-6);">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+            <h1 style="margin-top: 0;">{{ activity.title or activity.sport_type.value|title }}</h1>
+            <p class="text-muted" style="margin-top: var(--space-2);">
+                {{ activity.date }} &bull; <span class="badge">{{ activity.sport_type.value }}</span>
+                {% if activity.was_planned %}
+                    &bull; <span class="badge" style="background-color: var(--color-brand-primary);">Planned Workout</span>
+                {% endif %}
+            </p>
+        </div>
+        <a href="/" class="btn btn--secondary">Back to Dashboard</a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-top: var(--space-6);">
+        <div style="background-color: var(--color-bg-surface-subtle); padding: var(--space-4); border-radius: var(--radius-md);">
+            <div class="text-muted" style="font-size: var(--text-sm); text-transform: uppercase;">Distance</div>
+            <div style="font-size: var(--text-xl); font-weight: 600; margin-top: var(--space-2);">{{ "%.2f"|format(activity.distance_km) if activity.distance_km else '--' }} km</div>
+        </div>
+        <div style="background-color: var(--color-bg-surface-subtle); padding: var(--space-4); border-radius: var(--radius-md);">
+            <div class="text-muted" style="font-size: var(--text-sm); text-transform: uppercase;">Duration</div>
+            <div style="font-size: var(--text-xl); font-weight: 600; margin-top: var(--space-2);">{{ "%.1f"|format(activity.duration_min) if activity.duration_min else '--' }} min</div>
+        </div>
+        <div style="background-color: var(--color-bg-surface-subtle); padding: var(--space-4); border-radius: var(--radius-md);">
+            <div class="text-muted" style="font-size: var(--text-sm); text-transform: uppercase;">Avg Pace</div>
+            <div style="font-size: var(--text-xl); font-weight: 600; margin-top: var(--space-2);">
+                {% if activity.avg_pace_min_per_km %}
+                    {{ "%d:%02d"|format((activity.avg_pace_min_per_km)|int, ((activity.avg_pace_min_per_km % 1) * 60)|int) }}/km
+                {% else %}
+                    --
+                {% endif %}
+            </div>
+        </div>
+        <div style="background-color: var(--color-bg-surface-subtle); padding: var(--space-4); border-radius: var(--radius-md);">
+            <div class="text-muted" style="font-size: var(--text-sm); text-transform: uppercase;">Heart Rate</div>
+            <div style="font-size: var(--text-xl); font-weight: 600; margin-top: var(--space-2);">
+                {{ "%.0f"|format(activity.avg_hr) if activity.avg_hr else '--' }} avg
+                <span style="font-size: var(--text-sm); font-weight: normal;" class="text-muted"> / {{ "%.0f"|format(activity.max_hr) if activity.max_hr else '--' }} max</span>
+            </div>
+        </div>
+        <div style="background-color: var(--color-bg-surface-subtle); padding: var(--space-4); border-radius: var(--radius-md);">
+            <div class="text-muted" style="font-size: var(--text-sm); text-transform: uppercase;">Training Effect</div>
+            <div style="font-size: var(--text-xl); font-weight: 600; margin-top: var(--space-2);">
+                {{ "%.1f"|format(activity.training_effect_aerobic) if activity.training_effect_aerobic else '--' }} ae
+                <span style="font-size: var(--text-sm); font-weight: normal;" class="text-muted"> / {{ "%.1f"|format(activity.training_effect_anaerobic) if activity.training_effect_anaerobic else '--' }} an</span>
+            </div>
+        </div>
+        <div style="background-color: var(--color-bg-surface-subtle); padding: var(--space-4); border-radius: var(--radius-md);">
+            <div class="text-muted" style="font-size: var(--text-sm); text-transform: uppercase;">Ascent</div>
+            <div style="font-size: var(--text-xl); font-weight: 600; margin-top: var(--space-2);">{{ "%.0f"|format(activity.total_ascent_m) if activity.total_ascent_m else '--' }} m</div>
+        </div>
+    </div>
+</div>
+
+{% if activity.laps %}
+<div class="card">
+    <h2>Laps</h2>
+    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: var(--text-sm);">
+        <tr style="border-bottom: 1px solid var(--color-border-subtle);">
+            <th style="padding: var(--space-2) 0;">Lap</th>
+            <th style="padding: var(--space-2) 0;">Distance (km)</th>
+            <th style="padding: var(--space-2) 0;">Time (min)</th>
+            <th style="padding: var(--space-2) 0;">Pace (/km)</th>
+            <th style="padding: var(--space-2) 0;">Avg HR</th>
+            <th style="padding: var(--space-2) 0;">Max HR</th>
+        </tr>
+        {% for lap in activity.laps %}
+        <tr style="border-bottom: 1px solid var(--color-border-subtle);">
+            <td style="padding: var(--space-2) 0;">{{ lap.lap_index }}</td>
+            <td style="padding: var(--space-2) 0;">{{ "%.2f"|format(lap.distance_km) if lap.distance_km else '--' }}</td>
+            <td style="padding: var(--space-2) 0;">{{ "%.1f"|format(lap.duration_min) if lap.duration_min else '--' }}</td>
+            <td style="padding: var(--space-2) 0;">
+                {% if lap.avg_pace_min_per_km %}
+                    {{ "%d:%02d"|format((lap.avg_pace_min_per_km)|int, ((lap.avg_pace_min_per_km % 1) * 60)|int) }}
+                {% else %}
+                    --
+                {% endif %}
+            </td>
+            <td style="padding: var(--space-2) 0;">{{ "%.0f"|format(lap.avg_hr) if lap.avg_hr else '--' }}</td>
+            <td style="padding: var(--space-2) 0;">{{ "%.0f"|format(lap.max_hr) if lap.max_hr else '--' }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+{% else %}
+<div class="card">
+    <h2>Activity Not Found</h2>
+    <p>The requested activity could not be found or has not been synced.</p>
+    <a href="/" class="btn btn--secondary">Back to Dashboard</a>
+</div>
+{% endif %}
+{% endblock %}

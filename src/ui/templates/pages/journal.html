@@ -1,0 +1,117 @@
+{% extends "layouts/app_layout.html" %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr 300px; gap: var(--space-8);">
+    
+    <div>
+        <div style="display: flex; gap: var(--space-2); margin-bottom: var(--space-6);">
+            <a href="/journal" class="btn {{ 'btn--primary' if active_filter == 'ALL' else 'btn--secondary' }}">All</a>
+            <a href="/journal?category=FEELING,INJURY,EXERTION" class="btn {{ 'btn--primary' if active_filter != 'ALL' else 'btn--secondary' }}">Logs</a>
+        </div>
+        
+        <div id="journal-timeline" style="display: flex; flex-direction: column; gap: var(--space-4);">
+            {% for entry in entries %}
+                <div class="card" style="border-left: 4px solid {{ 'var(--color-brand-primary)' if entry.source.value == 'USER' else 'var(--color-accent)' }};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                        <div>
+                            <span class="badge">{{ entry.source.value }}</span>
+                            <span class="badge" style="background-color: var(--color-bg-surface-subtle);">{{ entry.category.value }}</span>
+                        </div>
+                        <span class="text-muted font-mono" style="font-size: var(--text-xs);">{{ entry.entry_date }}</span>
+                    </div>
+                    <p style="margin: 0;">{{ entry.text }}</p>
+                    {% if entry.rating %}
+                        <div style="margin-top: var(--space-2); font-size: var(--text-sm);">
+                            <strong>Rating:</strong> {{ entry.rating }}/10
+                        </div>
+                    {% endif %}
+                </div>
+            {% else %}
+                <div class="card text-muted" style="text-align: center; padding: var(--space-10) var(--space-4);">
+                    The chronicle is empty for this filter.
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <div style="position: sticky; top: var(--space-8);">
+        <div class="card">
+            <h3 style="margin-bottom: var(--space-4);">Log Entry</h3>
+            <form onsubmit="
+                event.preventDefault();
+                const formData = new FormData(this);
+                const data = Object.fromEntries(formData.entries());
+                if(data.rating) data.rating = parseInt(data.rating);
+                else delete data.rating;
+                
+                fetch('/api/journal', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                }).then(() => window.location.reload());
+            " style="display: flex; flex-direction: column; gap: var(--space-4);">
+                
+                <label>
+                    <span style="display: block; margin-bottom: var(--space-1); font-weight: var(--weight-medium); font-size: var(--text-sm);">Category</span>
+                    <select name="category" required style="padding: var(--space-2); width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary);">
+                        <option value="FEELING">Feeling</option>
+                        <option value="INJURY">Injury</option>
+                        <option value="EXERTION">Exertion</option>
+                        <option value="LIFESTYLE">Lifestyle</option>
+                        <option value="NOTE">Note</option>
+                    </select>
+                </label>
+                
+                <label>
+                    <span style="display: block; margin-bottom: var(--space-1); font-weight: var(--weight-medium); font-size: var(--text-sm);">Rating (1-10)</span>
+                    <input type="number" name="rating" min="1" max="10" style="padding: var(--space-2); width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary);">
+                </label>
+                
+                <label>
+                    <span style="display: block; margin-bottom: var(--space-1); font-weight: var(--weight-medium); font-size: var(--text-sm);">Text</span>
+                    <textarea name="text" required rows="4" style="padding: var(--space-2); width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary); resize: vertical;"></textarea>
+                </label>
+                
+                <button type="submit" class="btn btn--primary">Save to Journal</button>
+            </form>
+        </div>
+        
+        <div class="card" style="margin-top: var(--space-4);">
+            <h3 style="margin-bottom: var(--space-2);">Quick Capture</h3>
+            <p class="text-muted" style="font-size: var(--text-sm); margin-bottom: var(--space-4);">Frictionless logging for nutrition and notes.</p>
+            
+            <form onsubmit="
+                event.preventDefault();
+                const formData = new FormData(this);
+                const data = Object.fromEntries(formData.entries());
+                
+                document.getElementById('qc-preview').innerHTML = '<div class=\'text-muted\'>Parsing...</div>';
+                
+                fetch('/api/journal/quick-capture/parse', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                }).then(r => r.json()).then(res => {
+                    document.getElementById('qc-preview').innerHTML = '<div>Parsed item. <button type=\'button\' class=\'btn btn--primary btn--sm\' style=\'margin-top: 8px;\' onclick=\'confirmQC(\"' + res.text + '\")\'>Confirm & Save</button></div>';
+                });
+            ">
+                <textarea name="text" required rows="2" placeholder="e.g., 2 bowls of oatmeal..." style="padding: var(--space-2); width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary); margin-bottom: var(--space-2);"></textarea>
+                <button type="submit" class="btn btn--secondary" style="width: 100%;">Parse</button>
+            </form>
+            
+            <div id="qc-preview" style="margin-top: var(--space-4); font-size: var(--text-sm);"></div>
+            
+            <script>
+                function confirmQC(text) {
+                    fetch('/api/journal/quick-capture/confirm', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({text: text})
+                    }).then(() => window.location.reload());
+                }
+            </script>
+        </div>
+    </div>
+    
+</div>
+{% endblock %}

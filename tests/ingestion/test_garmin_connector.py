@@ -43,11 +43,19 @@ class FakeGarmin:
 
     def download_activity(self, activity_id: str, dl_fmt: Any = None) -> bytes:
         self.download_activity_calls.append(str(activity_id))
-        return f"fit-bytes-{activity_id}".encode()
+        import io, zipfile
+        z_io = io.BytesIO()
+        with zipfile.ZipFile(z_io, "w") as z:
+            z.writestr(f"{activity_id}.fit", f"fit-bytes-{activity_id}".encode())
+        return z_io.getvalue()
 
     def download_health_snapshot(self, requested_date: str) -> bytes:
         self.download_health_snapshot_calls.append(requested_date)
-        return f"wellness-{requested_date}".encode()
+        import io, zipfile
+        z_io = io.BytesIO()
+        with zipfile.ZipFile(z_io, "w") as z:
+            z.writestr("wellness.fit", f"wellness-{requested_date}".encode())
+        return z_io.getvalue()
 
     def get_scheduled_workouts(self, year: int, month: int) -> dict:
         return {
@@ -70,6 +78,15 @@ class FakeGarmin:
     def download_workout(self, workout_id: int | str) -> bytes:
         self.download_workout_calls.append(str(workout_id))
         return f"workout-fit-{workout_id}".encode()
+
+    def get_sleep_data(self, date: str) -> dict:
+        return {"dailySleepDTO": {"sleepTimeSeconds": 28800}}
+
+    def get_hrv_data(self, date: str) -> dict:
+        return {"hrvSummary": {"status": "BALANCED", "weeklyAvg": 45}}
+
+    def get_stats_and_body(self, date: str) -> dict:
+        return {"totalSteps": 10000}
 
 
 @pytest.fixture
@@ -109,12 +126,16 @@ def test_fetch_activities_writes_bronze_files_and_ledger_entries(
     entries = conn.fetch("athlete-1", EntityType.ACTIVITY, date(2026, 1, 1), date(2026, 1, 31))
 
     assert [e.source_identifier for e in entries] == ["111", "222"]
+    import zipfile, json
     for entry in entries:
         assert entry.vendor == "garmin"
         assert entry.entity_type is EntityType.ACTIVITY
         path = Path(entry.file_path)
         assert path.exists()
-        assert path.read_bytes() == f"fit-bytes-{entry.source_identifier}".encode()
+        with zipfile.ZipFile(path) as z:
+            assert z.read(f"{entry.source_identifier}.fit") == f"fit-bytes-{entry.source_identifier}".encode()
+            activity_json = json.loads(z.read("activity.json"))
+            assert activity_json["activityId"] == int(entry.source_identifier)
         assert path.parent == settings.data.bronze_dir / "athlete-1" / "garmin" / "activity"  # type: ignore[operator]
 
 
@@ -133,7 +154,7 @@ def test_fetch_is_idempotent_and_skips_rewriting_unchanged_payloads(
     assert fake_client.download_activity_calls == ["111", "222", "111", "222"]
 
 
-def test_fetch_daily_summaries_skips_missing_snapshots(connector: tuple[Connector, FakeGarmin]) -> None:
+def test_fetch_daily_summaries_generates_json_when_snapshot_missing(connector: tuple[Connector, FakeGarmin]) -> None:
     from garminconnect import GarminConnectNotFoundError
 
     conn, fake_client = connector
@@ -141,13 +162,17 @@ def test_fetch_daily_summaries_skips_missing_snapshots(connector: tuple[Connecto
     def flaky_download(requested_date: str) -> bytes:
         if requested_date == "2026-01-02":
             raise GarminConnectNotFoundError("no snapshot")
-        return f"wellness-{requested_date}".encode()
+        import io, zipfile
+        z_io = io.BytesIO()
+        with zipfile.ZipFile(z_io, "w") as z:
+            z.writestr("wellness.fit", f"wellness-{requested_date}".encode())
+        return z_io.getvalue()
 
     fake_client.download_health_snapshot = flaky_download  # type: ignore[assignment]
 
     entries = conn.fetch("athlete-1", EntityType.DAILY_SUMMARY, date(2026, 1, 1), date(2026, 1, 3))
 
-    assert [e.source_identifier for e in entries] == ["2026-01-01", "2026-01-03"]
+    assert [e.source_identifier for e in entries] == ["2026-01-01", "2026-01-02", "2026-01-03"]
 
 
 def test_fetch_workout_definitions_filters_by_calendar_date_range(

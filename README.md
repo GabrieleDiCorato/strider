@@ -12,7 +12,7 @@ A vendor-agnostic, local-first Personal AI Running Coach. Strider ingests wearab
 - **Data processing:** `polars`
 - **Storage:** `duckdb` + local Hive-partitioned `parquet` files
 - **Backend:** `fastapi`
-- **Agentic layer:** LLM-based ReAct/LangGraph coach (planned)
+- **Agentic layer:** LLM-based coach P.o.C. built with `Google ADK`
 
 ## Data Architecture
 
@@ -30,9 +30,11 @@ All pipeline steps are idempotent via a `sync_ledger` that tracks hashes/timesta
 # Install dependencies
 uv sync
 
-# Run a script
-uv run <script>
+# Start the development web server
+uv run uvicorn src.main:app --port 8000 --reload
 ```
+
+The web interface will be available at [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 Requires Python 3.12 (see `.python-version`).
 

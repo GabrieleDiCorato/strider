@@ -1,0 +1,322 @@
+/* ==========================================================================
+   STRIDER DESIGN SYSTEM — TOKENS (CSS CUSTOM PROPERTIES)
+   Stack: Jinja2 + HTMX + Vanilla CSS
+   Aesthetic: "The Ranger's Path" — Clean, modern, high-contrast athletic UI
+   with subtle mountain/forest/Middle-earth tonal accents.
+   ========================================================================== */
+
+:root {
+  /* ------------------------------------------------------------------------
+     1. PRIMITIVE PALETTE
+     Tonal roots:
+     - Slate & Stone: Misty Mountains, Caradhras granite
+     - Forest & Moss: Fangorn deep canopy, Ithilien greens
+     - Gold & Amber: Sun on high peaks, Mallorn gold, flame
+     - River & Sky: Anduin blue, clear alpine air
+     - Earth & Bark: Ranger leather, trail loam
+     ------------------------------------------------------------------------ */
+
+  /* Neutrals: Stone / Slate */
+  --pr-stone-50:  #f8faf9;
+  --pr-stone-100: #f0f4f2;
+  --pr-stone-200: #e2e9e5;
+  --pr-stone-300: #cbd6d0;
+  --pr-stone-400: #97a89f;
+  --pr-stone-500: #687970;
+  --pr-stone-600: #4a5951;
+  --pr-stone-700: #334039;
+  --pr-stone-800: #202b25;
+  --pr-stone-900: #121a16;
+  --pr-stone-950: #0a0f0d;
+
+  /* Forest Green (Fangorn / Ithilien) — Primary Brand */
+  --pr-forest-50:  #eef8f3;
+  --pr-forest-100: #daf0e4;
+  --pr-forest-200: #b6e2cc;
+  --pr-forest-300: #84cbab;
+  --pr-forest-400: #4dae85;
+  --pr-forest-500: #2a9166;
+  --pr-forest-600: #1e7552;
+  --pr-forest-700: #195d43;
+  --pr-forest-800: #164a36;
+  --pr-forest-900: #133d2e;
+  --pr-forest-950: #082118;
+
+  /* Amber Gold (Mallorn / Sunburst / Focus) — Accent & Energy */
+  --pr-gold-50:  #fffbeb;
+  --pr-gold-100: #fef3c7;
+  --pr-gold-200: #fde68a;
+  --pr-gold-300: #fcd34d;
+  --pr-gold-400: #fbbf24;
+  --pr-gold-500: #d97706;
+  --pr-gold-600: #b45309;
+  --pr-gold-700: #92400e;
+  --pr-gold-800: #78350f;
+  --pr-gold-900: #451a03;
+
+  /* Alpine Blue (Anduin / Sky / Recovery) */
+  --pr-sky-50:  #f0f9ff;
+  --pr-sky-100: #e0f2fe;
+  --pr-sky-200: #bae6fd;
+  --pr-sky-300: #7dd3fc;
+  --pr-sky-400: #38bdf8;
+  --pr-sky-500: #0284c7;
+  --pr-sky-600: #0369a1;
+  --pr-sky-700: #075985;
+  --pr-sky-800: #0c4a6e;
+  --pr-sky-900: #082f49;
+
+  /* Hearth & Warning Crimson / Rust (Mount Doom / Strain / High Alert) */
+  --pr-rust-50:  #fef2f2;
+  --pr-rust-100: #fee2e2;
+  --pr-rust-200: #fecaca;
+  --pr-rust-300: #fca5a5;
+  --pr-rust-400: #f87171;
+  --pr-rust-500: #dc2626;
+  --pr-rust-600: #b91c1c;
+  --pr-rust-700: #991b1b;
+  --pr-rust-800: #7f1d1d;
+  --pr-rust-900: #450a0a;
+
+  /* ------------------------------------------------------------------------
+     2. TYPOGRAPHY SCALES
+     Font Stacks:
+     - Display/Headings: Clean humanist sans with high legibility & poise ('Outfit', 'Plus Jakarta Sans', system sans)
+     - Data & Metrics: Tabular monospace numerals ('JetBrains Mono', 'Fira Code', 'SF Mono', monospace)
+     - Body: Clear, crisp UI sans ('Inter', system-ui, -apple-system, sans-serif)
+     ------------------------------------------------------------------------ */
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-display: 'Outfit', 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+
+  /* Font sizes (rem) */
+  --text-2xs:  0.6875rem; /* 11px - micro labels, zone tags */
+  --text-xs:   0.75rem;   /* 12px - metadata, sub-labels */
+  --text-sm:   0.875rem;  /* 14px - compact UI, secondary copy */
+  --text-base: 1rem;      /* 16px - body default */
+  --text-lg:   1.125rem;  /* 18px - card titles, subtitles */
+  --text-xl:   1.25rem;   /* 20px - section headers */
+  --text-2xl:  1.5rem;    /* 24px - page headers, secondary stats */
+  --text-3xl:  1.875rem;  /* 30px - prominent numbers */
+  --text-4xl:  2.25rem;   /* 36px - headline metrics (ACWR, Pace) */
+  --text-5xl:  3rem;      /* 48px - primary hero metrics */
+
+  /* Line heights */
+  --leading-none:     1;
+  --leading-tight:    1.2;
+  --leading-snug:     1.35;
+  --leading-normal:   1.5;
+  --leading-relaxed:  1.65;
+
+  /* Letter Spacing */
+  --tracking-tight:   -0.025em;
+  --tracking-normal:  0em;
+  --tracking-wide:    0.04em;
+  --tracking-widest:  0.08em;
+
+  /* Font Weights */
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+  --weight-extrabold: 800;
+
+  /* ------------------------------------------------------------------------
+     3. SPACING & LAYOUT GRID (4px / 8px baseline)
+     ------------------------------------------------------------------------ */
+  --space-1:  0.25rem;  /* 4px */
+  --space-2:  0.5rem;   /* 8px */
+  --space-3:  0.75rem;  /* 12px */
+  --space-4:  1rem;     /* 16px */
+  --space-5:  1.25rem;  /* 20px */
+  --space-6:  1.5rem;   /* 24px */
+  --space-8:  2rem;     /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+  --space-16: 4rem;     /* 64px */
+
+  /* Max widths */
+  --max-w-content: 1200px;
+  --max-w-readable: 68ch;
+  --max-w-card:    480px;
+
+  /* Border Radii */
+  --radius-xs: 0.25rem;  /* 4px */
+  --radius-sm: 0.375rem; /* 6px */
+  --radius-md: 0.5rem;   /* 8px */
+  --radius-lg: 0.75rem;  /* 12px */
+  --radius-xl: 1rem;     /* 16px */
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ------------------------------------------------------------------------
+     4. SEMANTIC THEME: LIGHT (DEFAULT - Alpine Morning / Ranger Waypoint)
+     ------------------------------------------------------------------------ */
+  --color-bg-canvas:        var(--pr-stone-50);
+  --color-bg-surface:       #ffffff;
+  --color-bg-surface-raised: var(--pr-stone-100);
+  --color-bg-surface-subtle: #f4f7f5;
+  --color-bg-surface-active: var(--pr-stone-200);
+
+  --color-border-subtle:     var(--pr-stone-200);
+  --color-border-muted:      var(--pr-stone-300);
+  --color-border-strong:     var(--pr-stone-500);
+
+  --color-text-primary:      var(--pr-stone-900);
+  --color-text-secondary:    var(--pr-stone-700);
+  --color-text-muted:        var(--pr-stone-500);
+  --color-text-inverse:      #ffffff;
+
+  /* Brand / Interactive */
+  --color-brand-primary:      var(--pr-forest-700);
+  --color-brand-primary-hover: var(--pr-forest-800);
+  --color-brand-subtle:       var(--pr-forest-100);
+  --color-brand-text:         var(--pr-forest-900);
+
+  /* Accent (Mallorn / Energy) */
+  --color-accent:             var(--pr-gold-600);
+  --color-accent-subtle:      var(--pr-gold-100);
+  --color-accent-text:        var(--pr-gold-900);
+
+  /* Functional Status */
+  --color-status-success:        var(--pr-forest-600);
+  --color-status-success-subtle: var(--pr-forest-100);
+  --color-status-warning:        var(--pr-gold-600);
+  --color-status-warning-subtle: var(--pr-gold-100);
+  --color-status-danger:         var(--pr-rust-600);
+  --color-status-danger-subtle:  var(--pr-rust-100);
+  --color-status-info:           var(--pr-sky-600);
+  --color-status-info-subtle:    var(--pr-sky-100);
+
+  /* Elevation Shadows */
+  --shadow-xs: 0 1px 2px rgba(18, 26, 22, 0.04);
+  --shadow-sm: 0 1px 3px rgba(18, 26, 22, 0.07), 0 1px 2px rgba(18, 26, 22, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(18, 26, 22, 0.07), 0 2px 4px -1px rgba(18, 26, 22, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(18, 26, 22, 0.08), 0 4px 6px -2px rgba(18, 26, 22, 0.03);
+
+  /* ------------------------------------------------------------------------
+     5. FITNESS & SPORTS DOMAIN PALETTE (Colorblind-Safe & Accessible)
+     ------------------------------------------------------------------------ */
+  /* Heart Rate Zones (Z1 - Recovery to Z5 - Maximum) */
+  --color-hr-z1: #38bdf8; /* Blue - Active Recovery */
+  --color-hr-z2: #2a9166; /* Forest Green - Aerobic / Endurance (Base) */
+  --color-hr-z3: #f59e0b; /* Amber - Tempo / Steady */
+  --color-hr-z4: #ea580c; /* Orange - Threshold / Hard */
+  --color-hr-z5: #dc2626; /* Crimson - Anaerobic / Max */
+
+  /* ACWR Sweet Spot & Risk Bands */
+  --color-acwr-low:      #38bdf8; /* <0.8 Under-training */
+  --color-acwr-optimal:  #1e7552; /* 0.8 - 1.3 "Sweet Spot" / The Ranger's Pace */
+  --color-acwr-elevated: #d97706; /* 1.3 - 1.5 Caution / Warning */
+  --color-acwr-high:     #dc2626; /* >1.5 Danger / Overreaching */
+  --color-acwr-unknown:  #97a89f; /* Insufficient history */
+
+  /* Readiness & Sleep Levels */
+  --color-readiness-good:     #1e7552;
+  --color-readiness-moderate: #d97706;
+  --color-readiness-low:      #dc2626;
+  --color-readiness-unknown:  #97a89f;
+
+  /* Metric Sparklines & Charts */
+  --chart-line-distance: var(--pr-forest-600);
+  --chart-line-duration: var(--pr-sky-600);
+  --chart-line-load:     var(--pr-gold-600);
+  --chart-grid:          var(--color-border-subtle);
+  --chart-tooltip-bg:    rgba(18, 26, 22, 0.92);
+  --chart-tooltip-text:  #ffffff;
+}
+
+/* ==========================================================================
+   DARK THEME: "[data-theme='dark']" (Night Watch / Fangorn Twilight)
+   Maintains clear glanceability in dark outdoor & low-light settings.
+   ========================================================================== */
+[data-theme="dark"] {
+  --color-bg-canvas:        var(--pr-stone-950);
+  --color-bg-surface:       var(--pr-stone-900);
+  --color-bg-surface-raised: var(--pr-stone-800);
+  --color-bg-surface-subtle: #17221c;
+  --color-bg-surface-active: var(--pr-stone-700);
+
+  --color-border-subtle:     #24332b;
+  --color-border-muted:      #34483e;
+  --color-border-strong:     var(--pr-stone-500);
+
+  --color-text-primary:      var(--pr-stone-50);
+  --color-text-secondary:    var(--pr-stone-300);
+  --color-text-muted:        var(--pr-stone-400);
+  --color-text-inverse:      var(--pr-stone-900);
+
+  /* Brand / Interactive */
+  --color-brand-primary:      var(--pr-forest-400);
+  --color-brand-primary-hover: var(--pr-forest-300);
+  --color-brand-subtle:       var(--pr-forest-950);
+  --color-brand-text:         var(--pr-forest-200);
+
+  /* Accent (Mallorn) */
+  --color-accent:             var(--pr-gold-400);
+  --color-accent-subtle:      var(--pr-gold-900);
+  --color-accent-text:        var(--pr-gold-200);
+
+  /* Functional Status */
+  --color-status-success:        var(--pr-forest-400);
+  --color-status-success-subtle: #0f2e21;
+  --color-status-warning:        var(--pr-gold-400);
+  --color-status-warning-subtle: #3a2205;
+  --color-status-danger:         var(--pr-rust-400);
+  --color-status-danger-subtle:  #3b0d0d;
+  --color-status-info:           var(--pr-sky-400);
+  --color-status-info-subtle:    #07283c;
+
+  /* Dark Elevation Shadows (Soft glow & depth) */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+
+  /* Chart Colors (Brightened for dark canvas contrast) */
+  --chart-line-distance: var(--pr-forest-400);
+  --chart-line-duration: var(--pr-sky-400);
+  --chart-line-load:     var(--pr-gold-400);
+  --chart-grid:          var(--color-border-subtle);
+  --chart-tooltip-bg:    rgba(240, 244, 242, 0.95);
+  --chart-tooltip-text:  var(--pr-stone-900);
+}
+
+/* ==========================================================================
+   6. ANIMATIONS & MICRO-INTERACTIONS
+   ========================================================================== */
+
+@keyframes mountain-mist {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes ember-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.4); }
+  50% { opacity: 0.8; box-shadow: 0 0 10px 2px rgba(217, 119, 6, 0.6); }
+}
+
+/* "Misty" sweeping gradient for loading states */
+.is-loading, .skeleton {
+  background: linear-gradient(90deg, var(--color-bg-surface) 25%, var(--color-bg-surface-active) 50%, var(--color-bg-surface) 75%);
+  background-size: 400% 100%;
+  animation: mountain-mist 2.5s ease-in-out infinite;
+  color: transparent !important;
+  border-color: transparent !important;
+  pointer-events: none;
+}
+
+[data-theme="dark"] .is-loading, [data-theme="dark"] .skeleton {
+  background: linear-gradient(90deg, var(--color-bg-surface) 25%, var(--color-bg-surface-raised) 50%, var(--color-bg-surface) 75%);
+  background-size: 400% 100%;
+}
+
+/* Ember pulse for Mallorn Gold accents */
+.animate-ember {
+  animation: ember-pulse 3s ease-in-out infinite;
+}

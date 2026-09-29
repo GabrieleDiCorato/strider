@@ -1,0 +1,39 @@
+{% extends "layouts/app_layout.html" %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+        {% for run in runs %}
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                    <div>
+                        <span class="badge">{{ run.action_id }}</span>
+                        <span class="badge" style="background-color: {{ 'var(--color-status-success-subtle)' if run.status.value == 'success' else 'var(--color-bg-surface-subtle)' }};">{{ run.status.value }}</span>
+                    </div>
+                    <span class="text-muted font-mono" style="font-size: var(--text-xs);">{{ run.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                </div>
+                
+                <div style="font-size: var(--text-sm); margin-bottom: var(--space-4);">
+                    <div class="text-muted" style="margin-bottom: var(--space-1);">Parameters:</div>
+                    <code style="background-color: var(--color-bg-surface-subtle); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); font-size: var(--text-xs);">{{ run.params_json }}</code>
+                </div>
+                
+                {% if run.status.value == 'success' %}
+                    <div style="padding-top: var(--space-4); border-top: 1px solid var(--color-border-subtle);">
+                        <div class="text-muted" style="font-size: var(--text-sm);">Output generated successfully.</div>
+                    </div>
+                {% elif run.status.value == 'failed' or run.status.value == 'no_data' %}
+                    <div style="padding-top: var(--space-4); border-top: 1px solid var(--color-border-subtle);">
+                        <div style="color: var(--color-status-danger); font-size: var(--text-sm);">{{ run.error }}</div>
+                    </div>
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="card text-muted" style="text-align: center; padding: var(--space-10) var(--space-4);">
+                No insights have been generated yet.
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

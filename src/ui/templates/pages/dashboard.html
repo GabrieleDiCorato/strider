@@ -1,0 +1,72 @@
+{% extends "layouts/app_layout.html" %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-6); margin-bottom: var(--space-8);">
+    
+    <div class="card">
+        <h3>Readiness</h3>
+        {% if readiness.has_data %}
+            <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+                <div><strong>Sleep:</strong> {{ "%.1f"|format(readiness.sleep_hours) if readiness.sleep_hours else '—' }} hours</div>
+                <div><strong>Sleep Score:</strong> {{ readiness.sleep_score or '—' }}</div>
+                <div><strong>Resting HR:</strong> {{ readiness.resting_hr or '—' }} bpm (7d avg: {{ "%.1f"|format(readiness.resting_hr_baseline_7d) if readiness.resting_hr_baseline_7d else '—' }})</div>
+                <div><strong>HRV Status:</strong> {{ readiness.hrv_status.value if readiness.hrv_status else '—' }}</div>
+                <div><strong>Body Battery:</strong> {{ readiness.body_battery_current or '—' }} (Charged: {{ readiness.body_battery_charged or '—' }}, Drained: {{ readiness.body_battery_drained or '—' }})</div>
+                <div><strong>VO2 Max:</strong> {{ readiness.vo2max or '—' }}</div>
+            </div>
+        {% else %}
+            <p class="text-muted">No readiness data for today.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h3>Training Load</h3>
+        <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+            <div><strong>ACWR:</strong> <span class="badge">{{ training_load.acwr_band | upper }}</span> {{ "%.2f"|format(training_load.acwr) if training_load.acwr else '—' }}</div>
+            <div><strong>7D Acute Load:</strong> {{ "%.1f"|format(training_load.rolling_7d_distance_km) }} km</div>
+            <div><strong>28D Chronic Load:</strong> {{ "%.1f"|format(training_load.rolling_28d_distance_km) }} km</div>
+            {% if training_load.insufficient_history %}
+            <div class="text-muted" style="font-size: var(--text-sm); margin-top: var(--space-2);">ℹ Requires ~28 days of data for stable baseline.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-6);">
+    <div>
+        <h2>Latest Coach Insight</h2>
+        {% if latest_insight %}
+            <div class="card" style="border-left: 4px solid var(--color-brand-primary);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                    <span class="badge">{{ latest_insight.action_id }}</span>
+                    <span class="text-muted font-mono" style="font-size: var(--text-xs);">{{ latest_insight.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                </div>
+                <h3>{{ latest_insight.narrative.headline if latest_insight.narrative else 'Insight' }}</h3>
+                <p>{{ latest_insight.narrative.summary if latest_insight.narrative else '' }}</p>
+                {% if latest_insight.narrative and latest_insight.narrative.get('recommendation') %}
+                    <div style="background-color: var(--color-bg-surface-subtle); padding: var(--space-3); border-radius: var(--radius-md); margin-top: var(--space-4);">
+                        <strong>Coach's Focus:</strong> {{ latest_insight.narrative.recommendation }}
+                    </div>
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="card text-muted">
+                <p>No recent coach insights available. Head to the Coach tab to generate one.</p>
+            </div>
+        {% endif %}
+        
+        <h2>Recent Activities</h2>
+        <div class="card" id="activities-container" hx-get="/activities?page=1" hx-trigger="load"><p class="text-muted">Loading activities...</p></div>
+    </div>
+    
+    <div>
+        <h2>Quick Actions</h2>
+        <div class="card" style="display: flex; flex-direction: column; gap: var(--space-2);">
+            <a href="/coach" class="btn btn--secondary">Run Morning Brief</a>
+            <a href="/coach" class="btn btn--secondary">Run Weekly Digest</a>
+            <a href="/journal" class="btn btn--primary">Log Journal Entry</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

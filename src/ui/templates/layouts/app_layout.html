@@ -1,0 +1,94 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block body %}
+<div class="desktop-container">
+    <aside class="sidebar">
+        <div style="margin-bottom: var(--space-8); display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: var(--space-4);">
+            <svg width="120" height="120" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom: var(--space-4);">
+                <!-- Background Mountains -->
+                <path d="M5 80 L25 50 L40 70 L60 40 L95 80 Z" fill="none" stroke="var(--color-text-muted)" stroke-width="2" stroke-linejoin="round" opacity="0.4"/>
+                
+                <!-- Seven Stars -->
+                <circle cx="20" cy="30" r="1.5" fill="var(--color-brand-primary)"/>
+                <circle cx="35" cy="20" r="1.5" fill="var(--color-brand-primary)"/>
+                <circle cx="50" cy="15" r="2" fill="var(--color-brand-primary)"/>
+                <circle cx="65" cy="20" r="1.5" fill="var(--color-brand-primary)"/>
+                <circle cx="80" cy="30" r="1.5" fill="var(--color-brand-primary)"/>
+                <circle cx="25" cy="45" r="1.5" fill="var(--color-brand-primary)"/>
+                <circle cx="75" cy="45" r="1.5" fill="var(--color-brand-primary)"/>
+                
+                <!-- Broken Sword (Narsil) -->
+                <!-- Handle -->
+                <path d="M50 90 L50 75" stroke="var(--color-brand-primary)" stroke-width="4" stroke-linecap="round"/>
+                <!-- Pommel -->
+                <circle cx="50" cy="92" r="3" fill="var(--color-brand-primary)"/>
+                <!-- Crossguard -->
+                <path d="M38 75 L62 75" stroke="var(--color-brand-primary)" stroke-width="3" stroke-linecap="round"/>
+                <!-- Lower Blade -->
+                <path d="M47 75 L47 50 L53 50 L53 75 Z" fill="var(--color-brand-primary)"/>
+                <!-- Broken edge -->
+                <path d="M47 50 L49 46 L51 51 L53 50" fill="none" stroke="var(--color-brand-primary)" stroke-width="1.5" stroke-linejoin="round"/>
+                <!-- Upper broken piece -->
+                <g transform="translate(-2, -5) rotate(-15 50 35)">
+                    <path d="M48 40 L50 20 L52 40 L50 42 Z" fill="var(--color-brand-primary)"/>
+                </g>
+            </svg>
+            <h2 style="color: var(--color-brand-primary); margin-bottom: var(--space-1); letter-spacing: 0.05em; text-transform: uppercase; font-size: 1.5rem;">Strider</h2>
+            <div class="text-muted" style="font-size: var(--text-sm); font-style: italic;">The Ranger's Path</div>
+        </div>
+        
+        <nav style="display: flex; flex-direction: column; gap: var(--space-2);">
+            <a href="/" class="btn btn--secondary" style="justify-content: flex-start;">Waypoint (Home)</a>
+            <a href="/coach" class="btn btn--secondary" style="justify-content: flex-start;">The Council (Coach)</a>
+            <a href="/journal" class="btn btn--secondary" style="justify-content: flex-start;">The Chronicle (Journal)</a>
+            <a href="/history" class="btn btn--secondary" style="justify-content: flex-start;">Hall of Deeds (History)</a>
+        </nav>
+    </aside>
+
+    <div class="main-area">
+        <header class="top-bar">
+            <div>
+                <h1 style="margin: 0; font-size: var(--text-xl);">{{ page_title }}</h1>
+            </div>
+            <div style="display: flex; align-items: center; gap: var(--space-4);">
+                <div id="sync-banner" style="display: flex; align-items: center; gap: var(--space-2);">
+                    <form hx-post="/api/sync" hx-target="#sync-banner" hx-swap="outerHTML" hx-indicator="#sync-spinner">
+                        <button class="btn btn--secondary" type="submit" id="sync-btn" style="position: relative;">
+                            <span id="sync-text">Sync Garmin</span>
+                            <span id="sync-spinner" class="htmx-indicator" style="margin-left: var(--space-2);">⏳ Syncing...</span>
+                        </button>
+                    </form>
+                </div>
+                <button class="btn btn--secondary" onclick="toggleTheme()">Toggle Theme</button>
+            </div>
+        </header>
+
+        <div class="hero-banner" style="width: 100%; height: 140px; overflow: hidden; border-bottom: 1px solid var(--color-border-subtle); background: var(--color-bg-canvas); position: relative;">
+            <svg width="100%" height="100%" preserveAspectRatio="none" viewBox="0 0 1000 140" xmlns="http://www.w3.org/2000/svg" style="position: absolute; bottom: 0; left: 0;">
+                
+                <!-- Distant Mountains -->
+                <path d="M0 140 L0 80 L80 45 L160 90 L240 35 L350 100 L450 45 L550 95 L650 40 L750 100 L850 50 L950 90 L1000 70 L1000 140 Z" fill="var(--color-bg-surface)" stroke="var(--color-border-subtle)" stroke-width="1"/>
+                
+                <!-- Midground Mountains -->
+                <path d="M0 140 L0 100 L120 55 L200 105 L280 65 L380 115 L480 60 L580 105 L700 50 L800 110 L900 70 L1000 105 L1000 140 Z" fill="var(--color-bg-surface-raised)" stroke="var(--color-border-subtle)" stroke-width="1.5"/>
+                
+                <!-- The River Anduin (Winding from the mountains) -->
+                <path d="M 450 100 C 480 110, 520 115, 500 140 L 560 140 C 580 115, 520 105, 480 95 Z" fill="var(--color-bg-surface-active)" />
+                <path d="M 460 98 C 470 102, 480 105, 490 108" fill="none" stroke="var(--color-brand-primary)" stroke-width="1" opacity="0.3"/>
+                
+                <!-- Foreground Terrain (Hills) -->
+                <path d="M0 140 L0 120 Q 150 105 300 125 T 500 135 L 500 140 L 0 140 Z" fill="var(--color-bg-surface-active)"/>
+                <path d="M560 140 C 570 135, 750 115, 1000 125 L 1000 140 L 560 140 Z" fill="var(--color-bg-surface-active)"/>
+                
+
+            </svg>
+        </div>
+        
+        <main class="content-container">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+{% endblock %}

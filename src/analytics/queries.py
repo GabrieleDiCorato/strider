@@ -42,6 +42,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from pathlib import Path
+import threading
 from typing import Any
 
 import duckdb
@@ -56,6 +57,8 @@ from src.core.schemas import (
     SilverWorkoutCalendar,
     SilverWorkoutDefinition,
 )
+
+_view_lock = threading.Lock()
 
 _SILVER_MODELS: dict[EntityType, type[BaseModel]] = {
     EntityType.ACTIVITY: SilverActivity,
@@ -230,6 +233,8 @@ def get_connection(
     resolved_db_path = str(db_path) if db_path is not None else str(settings.data.gold_db_path)
     resolved_silver_dir = str(silver_dir) if silver_dir is not None else str(settings.data.silver_dir)
     conn = duckdb.connect(resolved_db_path)
-    create_silver_views(conn, Path(resolved_silver_dir))
-    create_gold_views(conn)
+    with _view_lock:
+        create_silver_views(conn, Path(resolved_silver_dir))
+        create_gold_views(conn)
     return conn
+

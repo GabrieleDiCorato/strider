@@ -86,8 +86,12 @@ class ReadinessSnapshot(BaseModel):
     hrv_status: HrvStatus | None
     hrv_weekly_avg: float | None
     body_battery_high: int | None
+    body_battery_charged: int | None = None
+    body_battery_drained: int | None = None
+    body_battery_current: int | None = None
     avg_stress_level: float | None
     training_status: TrainingStatus | None
+    vo2max: float | None = None
 
 
 class WellnessAverages(BaseModel):

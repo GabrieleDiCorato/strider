@@ -1,0 +1,44 @@
+{% if activities %}
+<table style="width: 100%; border-collapse: collapse; text-align: left; font-size: var(--text-sm);">
+    <tr style="border-bottom: 1px solid var(--color-border-subtle);">
+        <th style="padding: var(--space-2) 0;">Date</th>
+        <th style="padding: var(--space-2) 0;">Title</th>
+        <th style="padding: var(--space-2) 0;">Sport</th>
+        <th style="padding: var(--space-2) 0;">Distance</th>
+        <th style="padding: var(--space-2) 0;">Time</th>
+        <th style="padding: var(--space-2) 0;">Pace</th>
+        <th style="padding: var(--space-2) 0;">Avg HR</th>
+    </tr>
+    {% for act in activities %}
+    <tr style="border-bottom: 1px solid var(--color-border-subtle); cursor: pointer;" onclick="window.open('/activity/{{ act.activity_id }}', '_blank')">
+        <td style="padding: var(--space-2) 0;">{{ act.date }}</td>
+        <td style="padding: var(--space-2) 0;"><strong>{{ act.title or act.sport_type.value|title }}</strong></td>
+        <td style="padding: var(--space-2) 0;"><span class="badge">{{ act.sport_type.value }}</span></td>
+        <td style="padding: var(--space-2) 0;">{{ "%.1f"|format(act.distance_km) if act.distance_km else '--' }} km</td>
+        <td style="padding: var(--space-2) 0;">{{ "%.0f"|format(act.duration_min) if act.duration_min else '--' }} min</td>
+        <td style="padding: var(--space-2) 0;">
+            {% if act.avg_pace_min_per_km %}
+                {{ "%d:%02d"|format((act.avg_pace_min_per_km)|int, ((act.avg_pace_min_per_km % 1) * 60)|int) }}/km
+            {% else %}
+                --
+            {% endif %}
+        </td>
+        <td style="padding: var(--space-2) 0;">{{ "%.0f"|format(act.avg_hr) if act.avg_hr else '--' }} bpm</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-4);">
+    <button class="btn btn--secondary" 
+            {% if has_prev %}hx-get="/activities?page={{ page - 1 }}" hx-target="#activities-container" hx-swap="innerHTML"{% else %}disabled{% endif %}>
+        Previous
+    </button>
+    <span class="text-muted" style="font-size: var(--text-sm);">Page {{ page }}</span>
+    <button class="btn btn--secondary" 
+            {% if has_next %}hx-get="/activities?page={{ page + 1 }}" hx-target="#activities-container" hx-swap="innerHTML"{% else %}disabled{% endif %}>
+        Next
+    </button>
+</div>
+{% else %}
+    <p class="text-muted">No recent activities found.</p>
+{% endif %}

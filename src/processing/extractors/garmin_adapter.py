@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import zipfile
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -150,6 +150,14 @@ class ActivityExtractor:
 
     def _extract_entry(self, entry: BronzeLedgerEntry) -> SilverActivity:
         messages = _read_fit_payload(entry.file_path)
+
+        import zipfile, json
+        activity_json = {}
+        if zipfile.is_zipfile(entry.file_path):
+            with zipfile.ZipFile(entry.file_path) as archive:
+                if 'activity.json' in archive.namelist():
+                    activity_json = json.loads(archive.read('activity.json').decode('utf-8'))
+
         sessions = messages.get("session", [])
         if not sessions:
             raise ValueError(f"Activity FIT payload has no session message: {entry.file_path}")
@@ -192,6 +200,7 @@ class ActivityExtractor:
             user_id=entry.user_id,
             updated_at=entry.fetch_timestamp,
             activity_id=entry.source_identifier,
+            activity_name=activity_json.get('activityName'),
             sport_type=_sport_type(sport_value, subtype_value),
             sport_sub_type=_sport_subtype(subtype_value),
             start_time=start_time,
@@ -248,12 +257,38 @@ class DailySummaryExtractor:
                 f"Daily summary identifier must be an ISO date: {entry.source_identifier!r}"
             ) from exc
 
+        # Read JSON payloads from the zip if present
+        import zipfile, json
+        stats_json = {}
+        sleep_json = {}
+        hrv_json = {}
+        if zipfile.is_zipfile(entry.file_path):
+            with zipfile.ZipFile(entry.file_path) as archive:
+                if 'stats.json' in archive.namelist():
+                    stats_json = json.loads(archive.read('stats.json').decode('utf-8'))
+                if 'sleep.json' in archive.namelist():
+                    sleep_json = json.loads(archive.read('sleep.json').decode('utf-8'))
+                if 'hrv.json' in archive.namelist():
+                    hrv_json = json.loads(archive.read('hrv.json').decode('utf-8'))
+
         all_records = [record for records in messages.values() for record in records]
         records = [record for record in all_records if record]
 
         sleep_records = messages.get("sleep_level", [])
         monitoring_records = messages.get("monitoring", [])
         sleep = _summarize_sleep(sleep_records)
+        
+        # Override sleep with JSON if available
+        ds = sleep_json.get('dailySleepDTO', {})
+        if ds.get('sleepTimeSeconds'):
+            sleep['start_time'] = datetime.fromtimestamp(ds['sleepStartTimestampGMT'] / 1000, tz=timezone.utc).replace(tzinfo=None) if ds.get('sleepStartTimestampGMT') else sleep['start_time']
+            sleep['end_time'] = datetime.fromtimestamp(ds['sleepEndTimestampGMT'] / 1000, tz=timezone.utc).replace(tzinfo=None) if ds.get('sleepEndTimestampGMT') else sleep['end_time']
+            sleep['duration_seconds'] = ds.get('sleepTimeSeconds', sleep.get('duration_seconds'))
+            sleep['deep_seconds'] = ds.get('deepSleepSeconds', sleep.get('deep_seconds'))
+            sleep['light_seconds'] = ds.get('lightSleepSeconds', sleep.get('light_seconds'))
+            sleep['rem_seconds'] = ds.get('remSleepSeconds', sleep.get('rem_seconds'))
+            sleep['awake_seconds'] = ds.get('awakeSleepSeconds', sleep.get('awake_seconds'))
+
         stress_records = _unique_records(messages.get("stress_level", []), "stress_level_time")
         stress_values = [
             value
@@ -271,56 +306,44 @@ class DailySummaryExtractor:
             (record["timestamp"], value)
             for record in respiration_records
             if isinstance(record.get("timestamp"), datetime)
-            and (value := _number(record.get("respiration_rate"))) is not None
-            and value > 0
+            and (value := _bounded_number(record.get("respiration_rate"), 0, 100)) is not None
         ]
-        stage_intervals = sleep["intervals"]
-        waking_respiration = [
-            value
-            for timestamp, value in respiration_values
-            if not _is_sleep_timestamp(timestamp, stage_intervals)
-        ]
-        sleep_respiration = [
-            value
-            for timestamp, value in respiration_values
-            if _is_sleep_timestamp(timestamp, stage_intervals)
-        ]
-        monitoring_hr = messages.get("monitoring_hr_data", [])
-        steps_values = [
-            value
-            for record in monitoring_records
-            if (value := _number(record.get("steps"))) is not None
-        ]
-        active_calories = [
-            value
-            for record in monitoring_records
-            if (value := _number(record.get("active_calories"))) is not None
-        ]
-        total_calories = [
-            value
-            for record in monitoring_records
-            if (value := _number(record.get("calories"))) is not None
-        ]
-        hrv_status = _mapped_enum(
-            _first(
-                next(
-                    (record for record in messages.get("hrv_status_summary", []) if record.get("status") is not None),
-                    {},
-                ),
-                "status",
-            ),
-            HrvStatus,
-        )
+        stage_intervals = sleep.get("stage_intervals", [])
+
+        monitoring_hr = _unique_records(messages.get("monitoring_hr_data", []), "timestamp")
+
+        hrv_status_str = _first(next((record for record in messages.get("hrv_status_summary", []) if record.get("status") is not None), {}), "status")
+        if not hrv_status_str and hrv_json.get('hrvSummary'):
+            hrv_status_str = hrv_json['hrvSummary'].get('status')
+        hrv_status = _mapped_enum(hrv_status_str, HrvStatus)
+        
         training_status = _mapped_enum(
             _first(next((r for r in records if _first(r, "training_status") is not None), {}),
                    "training_status"), TrainingStatus
         )
 
+        sleep_score = _record_number(messages.get("sleep_assessment", []), "overall_sleep_score")
+        if not sleep_score and ds.get('sleepScores'):
+            sleep_score = ds['sleepScores'].get('overall', {}).get('value')
+            
+        hrv_weekly_avg = _record_number(messages.get("hrv_status_summary", []), "weekly_average")
+        if not hrv_weekly_avg and hrv_json.get('hrvSummary'):
+            hrv_weekly_avg = hrv_json['hrvSummary'].get('weeklyAvg')
+
+        respiration_sleep = [
+            value for record_time, value in respiration_values
+            if _is_sleep_timestamp(record_time, sleep.get("intervals", []))
+        ]
+        respiration_waking = [
+            value for record_time, value in respiration_values
+            if not _is_sleep_timestamp(record_time, sleep.get("intervals", []))
+        ]
+
         return SilverDailySummary(
             user_id=entry.user_id,
             updated_at=entry.fetch_timestamp,
             calendar_date=calendar_date,
-            sleep_score=_record_number(messages.get("sleep_assessment", []), "overall_sleep_score"),
+            sleep_score=sleep_score,
             sleep_start_time=sleep["start_time"],
             sleep_end_time=sleep["end_time"],
             sleep_duration_seconds=sleep["duration_seconds"],
@@ -340,29 +363,26 @@ class DailySummaryExtractor:
             ),
             resting_hr=_record_number(
                 monitoring_hr, "current_day_resting_heart_rate", "resting_heart_rate"
-            ),
+            ) or stats_json.get('restingHeartRate'),
             resting_hr_7day_avg=_record_number(records, "resting_hr_7day_avg"),
             hrv_status=hrv_status,
-            hrv_weekly_avg=_record_number(
-                messages.get("hrv_status_summary", []), "weekly_average"
-            ),
-            body_battery_high=_extreme_int(messages.get("hsa_body_battery_data", []), "level", max),
-            body_battery_low=_extreme_int(messages.get("hsa_body_battery_data", []), "level", min),
-            avg_stress_level=sum(stress_values) / len(stress_values) if stress_values else None,
-            max_stress_level=max(stress_values) if stress_values else None,
+            hrv_weekly_avg=hrv_weekly_avg,
+            body_battery_high=_extreme_int(messages.get("hsa_body_battery_data", []), "level", max) or stats_json.get('bodyBatteryHighestValue'),
+            body_battery_low=_extreme_int(messages.get("hsa_body_battery_data", []), "level", min) or stats_json.get('bodyBatteryLowestValue'),
+            body_battery_charged=stats_json.get('bodyBatteryChargedValue'),
+            body_battery_drained=stats_json.get('bodyBatteryDrainedValue'),
+            body_battery_current=stats_json.get('bodyBatteryMostRecentValue'),
+            avg_stress_level=_average(stress_values) or stats_json.get('averageStressLevel'),
+            max_stress_level=_extreme_int(stress_records, "stress_level_value", max) or stats_json.get('maxStressLevel'),
+            avg_spo2=_average(spo2_values) or stats_json.get('averageSpo2'),
+            lowest_spo2=_extreme_int(spo2_records, "reading_spo2", min) or stats_json.get('lowestSpo2'),
+            avg_respiration_waking=_average(respiration_waking),
+            avg_respiration_sleep=_average(respiration_sleep),
+            steps=_extreme_int(records, "steps", max) or stats_json.get('totalSteps'),
+            calories_active=_extreme_int(records, "active_calories", max) or stats_json.get('activeKilocalories'),
+            calories_total=_extreme_int(records, "calories", max),
             training_status=training_status,
-            training_load_balance=_record_number(records, "training_load_balance", "load_balance"),
-            vo2max_running=_record_number(records, "vo2_max_running", "vo2max_running"),
-            avg_spo2=_average(spo2_values),
-            lowest_spo2=min(spo2_values) if spo2_values else None,
-            avg_respiration_waking=_average(waking_respiration),
-            avg_respiration_sleep=_average(sleep_respiration),
-            steps=int(max(steps_values)) if steps_values else None,
-            calories_active=max(active_calories) if active_calories else None,
-            calories_total=max(total_calories) if total_calories else None,
-            vendor_specific={},
         )
-
 
 class WorkoutExtractor:
     """Map FIT workout/workout_step messages to structured Silver definitions."""

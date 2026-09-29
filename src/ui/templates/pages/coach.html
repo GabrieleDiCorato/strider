@@ -1,0 +1,107 @@
+{% extends "layouts/app_layout.html" %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);">
+    <div>
+        <h2 style="margin-bottom: var(--space-4);">Available Actions</h2>
+        
+        {% for action in actions_catalog %}
+            <div class="card" style="margin-bottom: var(--space-4);">
+                <h3>{{ action.title }} <span class="badge" style="font-weight: normal; margin-left: var(--space-2);">{{ action.action_id }}</span></h3>
+                <p class="text-muted" style="margin-bottom: var(--space-4); font-size: var(--text-sm);">Executes AI insights pipeline utilizing Gold metrics and Journal context.</p>
+                
+                <form hx-post="/api/actions/{{ action.action_id }}/run"
+                      hx-target="#action-result-container"
+                      hx-swap="innerHTML"
+                      hx-ext="json-enc"
+                      style="display: flex; flex-direction: column; gap: var(--space-4);">
+                    
+                    {% if action.action_id == 'readiness_check' %}
+                        <label>
+                            <span style="display: block; margin-bottom: var(--space-1); font-weight: var(--weight-medium); font-size: var(--text-sm);">Day (Optional)</span>
+                            <input type="date" name="day" style="padding: var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary);">
+                        </label>
+                    {% elif action.action_id == 'weekly_digest' %}
+                        <label>
+                            <span style="display: block; margin-bottom: var(--space-1); font-weight: var(--weight-medium); font-size: var(--text-sm);">Week Start (Monday)</span>
+                            <input type="date" name="week_start" style="padding: var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary);">
+                        </label>
+                    {% elif action.action_id == 'explain_activity' %}
+                        <label>
+                            <span style="display: block; margin-bottom: var(--space-1); font-weight: var(--weight-medium); font-size: var(--text-sm);">Activity</span>
+                            <select name="activity_id" required style="padding: var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary); width: 100%;">
+                                <option value="" disabled selected>Select an activity...</option>
+                                {% for act in activities_for_select %}
+                                    <option value="{{ act.id }}">{{ act.date }} - {{ act.name }} ({{ "%.1f"|format(act.distance) if act.distance else 0 }} km)</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                    {% elif action.action_id == 'compare_periods' %}
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2);">
+                            <label>
+                                <span style="display: block; margin-bottom: var(--space-1); font-size: var(--text-sm);">Period A Start</span>
+                                <input type="date" name="period_a_start" required style="padding: var(--space-2); width: 100%;">
+                            </label>
+                            <label>
+                                <span style="display: block; margin-bottom: var(--space-1); font-size: var(--text-sm);">Period A End</span>
+                                <input type="date" name="period_a_end" required style="padding: var(--space-2); width: 100%;">
+                            </label>
+                            <label>
+                                <span style="display: block; margin-bottom: var(--space-1); font-size: var(--text-sm);">Period B Start</span>
+                                <input type="date" name="period_b_start" required style="padding: var(--space-2); width: 100%;">
+                            </label>
+                            <label>
+                                <span style="display: block; margin-bottom: var(--space-1); font-size: var(--text-sm);">Period B End</span>
+                                <input type="date" name="period_b_end" required style="padding: var(--space-2); width: 100%;">
+                            </label>
+                        </div>
+                    {% endif %}
+                    
+                    <button type="submit" class="btn btn--primary" style="align-self: flex-start;" onclick="
+                        event.preventDefault();
+                        const form = this.closest('form');
+                        const formData = new FormData(form);
+                        const data = Object.fromEntries(formData.entries());
+                        Object.keys(data).forEach(k => data[k] === '' && delete data[k]);
+                        
+                        document.getElementById('action-result-container').innerHTML = '<div class=\'is-loading\' style=\'height: 200px; border-radius: var(--radius-md);\'></div>';
+                        
+                        fetch(form.getAttribute('hx-post'), {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(data)
+                        }).then(r => r.json()).then(res => {
+                            let html = '<div class=\\'card\\'>';
+                            html += '<span class=\\'badge\\'>' + res.status + '</span>';
+                            if (res.status === 'success') {
+                                html += '<h3>' + res.narrative.headline + '</h3>';
+                                html += '<p>' + res.narrative.summary + '</p>';
+                                if (res.narrative.observations && res.narrative.observations.length) {
+                                    html += '<h4>Observations</h4><ul>';
+                                    res.narrative.observations.forEach(o => html += '<li>'+o+'</li>');
+                                    html += '</ul>';
+                                }
+                            } else {
+                                html += '<p>' + res.message + '</p>';
+                            }
+                            html += '</div>';
+                            document.getElementById('action-result-container').innerHTML = html;
+                        }).catch(e => {
+                            document.getElementById('action-result-container').innerHTML = '<div class=\\'card text-muted\\'>Error executing action.</div>';
+                        });
+                    ">Execute Action</button>
+                </form>
+            </div>
+        {% endfor %}
+    </div>
+    
+    <div>
+        <h2 style="margin-bottom: var(--space-4);">Execution Result</h2>
+        <div id="action-result-container">
+            <div class="card text-muted" style="text-align: center; padding: var(--space-10) var(--space-4);">
+                Select an action and press Execute to see the AI Coach insights here.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

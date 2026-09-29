@@ -43,7 +43,7 @@ def get_activity_summary(ctx: ToolContext, activity_id: str) -> ActivitySummary 
             avg_heart_rate, max_heart_rate, hr_zone_seconds,
             training_effect_aerobic, training_effect_anaerobic,
             total_ascent_meters, lap_count, lap_summaries,
-            workout_id, is_planned_workout
+            workout_id, is_planned_workout, activity_name
         FROM silver_activity
         WHERE user_id = ? AND activity_id = ?
     """, [ctx.user_id, activity_id]).fetchone()
@@ -75,11 +75,19 @@ def get_activity_summary(ctx: ToolContext, activity_id: str) -> ActivitySummary 
             avg_hr=lap_hr
         ))
 
+    workout_id = row[14]
+    activity_name = row[16]
+    title = activity_name
+    if workout_id:
+        wd = ctx.gold.execute("SELECT workout_title FROM silver_workout_definition WHERE user_id = ? AND workout_id = ?", [ctx.user_id, workout_id]).fetchone()
+        if wd and wd[0]:
+            title = wd[0]
+
     return ActivitySummary(
         activity_id=row[0],
         date=row[1],
         sport_type=SportType(sport),
-        title=None,
+        title=title,
         distance_km=dist_km,
         duration_min=dur_min,
         avg_pace_min_per_km=pace,
@@ -91,7 +99,7 @@ def get_activity_summary(ctx: ToolContext, activity_id: str) -> ActivitySummary 
         total_ascent_m=round(row[11], 2) if row[11] else None,
         lap_count=row[12],
         laps=laps,
-        workout_id=row[14],
+        workout_id=workout_id,
         was_planned=row[15] if row[15] is not None else False
     )
 
@@ -191,12 +199,20 @@ def get_period_summary(ctx: ToolContext, start: date, end: date) -> PeriodSummar
         longest_activity_id=longest_id
     )
 
-def get_recent_activities(ctx: ToolContext, start: date, end: date, limit: int = 10) -> list[ActivitySummary]:
-    rows = ctx.gold.execute("""
-        SELECT activity_id FROM silver_activity
-        WHERE user_id = ? AND CAST(start_time AS DATE) >= ? AND CAST(start_time AS DATE) <= ?
-        ORDER BY start_time DESC LIMIT ?
-    """, [ctx.user_id, start, end, limit]).fetchall()
+def get_recent_activities(ctx: ToolContext, start: date | None = None, end: date | None = None, limit: int = 10, offset: int = 0) -> list[ActivitySummary]:
+    query = "SELECT activity_id FROM silver_activity WHERE user_id = ?"
+    params = [ctx.user_id]
+    if start:
+        query += " AND CAST(start_time AS DATE) >= ?"
+        params.append(start)
+    if end:
+        query += " AND CAST(start_time AS DATE) <= ?"
+        params.append(end)
+    
+    query += " ORDER BY start_time DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+
+    rows = ctx.gold.execute(query, params).fetchall()
     
     res = []
     for (aid,) in rows:
@@ -265,7 +281,8 @@ def get_readiness_snapshot(ctx: ToolContext, day: date) -> ReadinessSnapshot:
         SELECT
             sleep_score, sleep_duration_seconds, resting_hr,
             hrv_status, hrv_weekly_avg, body_battery_high,
-            avg_stress_level, training_status
+            avg_stress_level, training_status, body_battery_charged, body_battery_drained, body_battery_current,
+            vo2max_running
         FROM silver_daily_summary
         WHERE user_id = ? AND calendar_date = ?
     """, [ctx.user_id, day]).fetchone()
@@ -275,7 +292,7 @@ def get_readiness_snapshot(ctx: ToolContext, day: date) -> ReadinessSnapshot:
             day=day, has_data=False,
             sleep_score=None, sleep_hours=None, resting_hr=None,
             resting_hr_baseline_7d=None, hrv_status=None, hrv_weekly_avg=None,
-            body_battery_high=None, avg_stress_level=None, training_status=None
+            body_battery_high=None, body_battery_charged=None, body_battery_drained=None, body_battery_current=None, avg_stress_level=None, training_status=None, vo2max=None
         )
         
     baseline_row = ctx.gold.execute("""
@@ -296,7 +313,11 @@ def get_readiness_snapshot(ctx: ToolContext, day: date) -> ReadinessSnapshot:
         hrv_weekly_avg=round(row[4], 1) if row[4] else None,
         body_battery_high=row[5],
         avg_stress_level=round(row[6], 1) if row[6] else None,
-        training_status=TrainingStatus(row[7]) if row[7] else None
+        training_status=TrainingStatus(row[7]) if row[7] else None,
+        body_battery_charged=row[8],
+        body_battery_drained=row[9],
+        body_battery_current=row[10],
+        vo2max=round(row[11], 1) if row[11] else None
     )
 
 

@@ -129,42 +129,87 @@ class GarminConnector:
     # ------------------------------------------------------------------
 
     def _fetch_activities(self, user_id: str, start: date, end: date) -> list[BronzeLedgerEntry]:
+        import io, zipfile, json
         raw_activities = self._call(
             self._client.get_activities_by_date, start.isoformat(), end.isoformat()
         )
         entries = []
         for activity in raw_activities:
             activity_id = str(activity["activityId"])
-            payload = self._call(
-                self._client.download_activity,
-                activity_id,
-                dl_fmt=Garmin.ActivityDownloadFormat.ORIGINAL,
-            )
+            try:
+                payload = self._call(
+                    self._client.download_activity,
+                    activity_id,
+                    dl_fmt=Garmin.ActivityDownloadFormat.ORIGINAL,
+                )
+            except Exception as e:
+                logger.info("Failed to download FIT for activity %s: %s", activity_id, e)
+                # Fallback to empty zip
+                z_io = io.BytesIO(b'PK\x05\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
+                payload = z_io.getvalue()
+            
+            # Append JSON to payload zip
+            z_io = io.BytesIO(payload)
+            with zipfile.ZipFile(z_io, "a") as z:
+                z.writestr("activity.json", json.dumps(activity).encode("utf-8"))
+            
+            final_payload = z_io.getvalue()
+
             entries.append(
                 self._persist_bronze_payload(
                     user_id=user_id,
                     entity_type=EntityType.ACTIVITY,
                     source_identifier=activity_id,
-                    payload=payload,
+                    payload=final_payload,
                     suffix=".zip",
                 )
             )
         return entries
 
     def _fetch_daily_summaries(self, user_id: str, start: date, end: date) -> list[BronzeLedgerEntry]:
+        import io, zipfile, json
         entries = []
         for day in _date_range(start, end):
             try:
                 payload = self._call(self._client.download_health_snapshot, day.isoformat())
             except (GarminConnectNotFoundError, GarminConnectConnectionError) as e:
                 logger.info("No wellness snapshot available for %s: %s", day, e)
-                continue
+                # Create an empty zip in memory if FIT snapshot is missing
+                z_io = io.BytesIO(b'PK\x05\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
+                payload = z_io.getvalue()
+            
+            # Fetch JSON endpoints
+            stats = {}
+            sleep = {}
+            hrv = {}
+            try:
+                stats = self._call(self._client.get_stats_and_body, day.isoformat())
+            except Exception as e:
+                logger.info("Failed to get stats for %s: %s", day, e)
+            try:
+                sleep = self._call(self._client.get_sleep_data, day.isoformat())
+            except Exception as e:
+                logger.info("Failed to get sleep for %s: %s", day, e)
+            try:
+                hrv = self._call(self._client.get_hrv_data, day.isoformat())
+            except Exception as e:
+                logger.info("Failed to get hrv for %s: %s", day, e)
+            
+            # Append JSON to payload zip
+            z_io = io.BytesIO(payload)
+            with zipfile.ZipFile(z_io, "a") as z:
+                z.writestr("stats.json", json.dumps(stats).encode("utf-8"))
+                z.writestr("sleep.json", json.dumps(sleep).encode("utf-8"))
+                z.writestr("hrv.json", json.dumps(hrv).encode("utf-8"))
+            
+            final_payload = z_io.getvalue()
+
             entries.append(
                 self._persist_bronze_payload(
                     user_id=user_id,
                     entity_type=EntityType.DAILY_SUMMARY,
                     source_identifier=day.isoformat(),
-                    payload=payload,
+                    payload=final_payload,
                     suffix=".zip",
                 )
             )

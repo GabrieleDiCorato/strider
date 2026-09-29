@@ -10,10 +10,13 @@ dependencies = [
     "fitdecode>=0.11.0",
     "garminconnect>=0.3.16",
     "google-adk>=2.10.0",
+    "jinja2>=3.1.6",
     "pandera>=0.33.1",
     "polars>=1.44.2",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
+    "python-multipart>=0.0.32",
+    "uvicorn>=0.54.0",
 ]
 
 [dependency-groups]
