@@ -262,6 +262,7 @@ class DailySummaryExtractor:
         stats_json = {}
         sleep_json = {}
         hrv_json = {}
+        ts_json = {}
         if zipfile.is_zipfile(entry.file_path):
             with zipfile.ZipFile(entry.file_path) as archive:
                 if 'stats.json' in archive.namelist():
@@ -270,6 +271,8 @@ class DailySummaryExtractor:
                     sleep_json = json.loads(archive.read('sleep.json').decode('utf-8'))
                 if 'hrv.json' in archive.namelist():
                     hrv_json = json.loads(archive.read('hrv.json').decode('utf-8'))
+                if 'training_status.json' in archive.namelist():
+                    ts_json = json.loads(archive.read('training_status.json').decode('utf-8'))
 
         all_records = [record for records in messages.values() for record in records]
         records = [record for record in all_records if record]
@@ -317,10 +320,12 @@ class DailySummaryExtractor:
             hrv_status_str = hrv_json['hrvSummary'].get('status')
         hrv_status = _mapped_enum(hrv_status_str, HrvStatus)
         
-        training_status = _mapped_enum(
-            _first(next((r for r in records if _first(r, "training_status") is not None), {}),
-                   "training_status"), TrainingStatus
-        )
+        training_status_str = _first(next((r for r in records if _first(r, "training_status") is not None), {}), "training_status")
+        if not training_status_str and ts_json.get('mostRecentTrainingStatus'):
+            training_status_str = ts_json.get('mostRecentTrainingStatus')
+        training_status = _mapped_enum(training_status_str, TrainingStatus)
+        
+        vo2max_running = ts_json.get('mostRecentVO2Max')
 
         sleep_score = _record_number(messages.get("sleep_assessment", []), "overall_sleep_score")
         if not sleep_score and ds.get('sleepScores'):
@@ -382,6 +387,7 @@ class DailySummaryExtractor:
             calories_active=_extreme_int(records, "active_calories", max) or stats_json.get('activeKilocalories'),
             calories_total=_extreme_int(records, "calories", max),
             training_status=training_status,
+            vo2max_running=vo2max_running,
         )
 
 class WorkoutExtractor:

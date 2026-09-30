@@ -6,14 +6,14 @@ interface (architecture guidelines §1). Never persists vendor secrets — the G
 password lives exclusively in `core.config.GarminSettings`, sourced from `.env`.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import duckdb
 
 from src.core.config import get_settings
 from src.core.duckdb_utils import from_utc_naive, to_utc_naive
-from src.core.schemas import GarminAccountLink, User
+from src.core.schemas import GarminAccountLink, User, DataSourceConfig
 
 
 class AccountStore:
@@ -43,6 +43,13 @@ class AccountStore:
                     last_authenticated_at TIMESTAMP
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS data_source_history (
+                    user_id VARCHAR REFERENCES users(user_id),
+                    data_source VARCHAR,
+                    changed_at TIMESTAMP
+                )
+            """)
 
     def upsert_user(self, user: User) -> None:
         """Insert or update a Strider user row."""
@@ -62,6 +69,37 @@ class AccountStore:
         if row is None:
             return None
         return User(user_id=row[0], display_name=row[1], created_at=from_utc_naive(row[2]))
+
+    def set_data_source(self, config: DataSourceConfig) -> None:
+        """Record a change to the user's selected data source in the append-only history."""
+        with duckdb.connect(self.db_path) as conn:
+            conn.execute("""
+                INSERT INTO data_source_history (user_id, data_source, changed_at)
+                VALUES (?, ?, ?)
+            """, [config.user_id, config.data_source, to_utc_naive(config.changed_at)])
+
+    def get_data_source(self, user_id: str) -> DataSourceConfig:
+        """Get the most recent data source configuration for a user. Defaults to 'garmin'."""
+        with duckdb.connect(self.db_path) as conn:
+            row = conn.execute("""
+                SELECT user_id, data_source, changed_at 
+                FROM data_source_history 
+                WHERE user_id = ? 
+                ORDER BY changed_at DESC 
+                LIMIT 1
+            """, [user_id]).fetchone()
+        
+        if row is None:
+            return DataSourceConfig(
+                user_id=user_id, 
+                data_source="garmin", 
+                changed_at=datetime.fromtimestamp(0, tz=timezone.utc)
+            )
+        return DataSourceConfig(
+            user_id=row[0],
+            data_source=row[1],
+            changed_at=from_utc_naive(row[2])
+        )
 
     def link_garmin_account(self, link: GarminAccountLink) -> None:
         """Insert or update the Garmin account linked to a user (requires the user to already exist)."""

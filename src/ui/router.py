@@ -170,3 +170,34 @@ async def activity_detail(
             "activity": activity,
         }
     )
+
+@router.get("/api/realtime/readiness", response_class=HTMLResponse)
+async def realtime_readiness(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)]
+):
+    from src.ingestion.garmin.garmin_connector import GarminConnector
+    import logging
+    
+    try:
+        connector = GarminConnector(settings)
+        metrics = connector.get_realtime_metrics(settings.user_id)
+        hr_text = str(metrics.heart_rate) if metrics.heart_rate is not None else "—"
+        ts_text = metrics.timestamp.strftime('%H:%M:%S')
+    except Exception as e:
+        logging.error(f"Error fetching realtime metrics: {e}")
+        hr_text = "—"
+        ts_text = ""
+        
+    html = f"""
+    <div id="realtime-data" hx-get="/api/realtime/readiness" hx-trigger="every 60s" hx-swap="outerHTML">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <h3>Live Device Data</h3>
+            <span class="text-muted" style="font-size: var(--text-xs); font-family: monospace;">Last update: {ts_text}</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2);">
+            <div><strong>Heart Rate:</strong> <span style="font-size: 1.2em; font-weight: bold; color: var(--color-brand-primary);">{hr_text}</span> bpm</div>
+        </div>
+    </div>
+    """
+    return HTMLResponse(content=html)

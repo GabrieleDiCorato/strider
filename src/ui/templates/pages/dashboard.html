@@ -30,6 +30,16 @@
             {% endif %}
         </div>
     </div>
+
+    <div class="card" id="realtime-data" hx-get="/api/realtime/readiness" hx-trigger="load, every 60s" hx-swap="outerHTML">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <h3>Live Device Data</h3>
+            <span class="text-muted" style="font-size: var(--text-xs); font-family: monospace;">Loading...</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2);">
+            <div><strong>Heart Rate:</strong> <span style="font-size: 1.2em; font-weight: bold; color: var(--color-brand-primary);">—</span> bpm</div>
+        </div>
+    </div>
 </div>
 
 <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-6);">

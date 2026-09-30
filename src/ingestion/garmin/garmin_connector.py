@@ -183,7 +183,7 @@ class GarminConnector:
             sleep = {}
             hrv = {}
             try:
-                stats = self._call(self._client.get_stats_and_body, day.isoformat())
+                stats = self._call(self._client.get_stats, day.isoformat())
             except Exception as e:
                 logger.info("Failed to get stats for %s: %s", day, e)
             try:
@@ -195,12 +195,19 @@ class GarminConnector:
             except Exception as e:
                 logger.info("Failed to get hrv for %s: %s", day, e)
             
+            training_status = {}
+            try:
+                training_status = self._call(self._client.get_training_status, day.isoformat())
+            except Exception as e:
+                logger.info("Failed to get training status for %s: %s", day, e)
+            
             # Append JSON to payload zip
             z_io = io.BytesIO(payload)
             with zipfile.ZipFile(z_io, "a") as z:
                 z.writestr("stats.json", json.dumps(stats).encode("utf-8"))
                 z.writestr("sleep.json", json.dumps(sleep).encode("utf-8"))
                 z.writestr("hrv.json", json.dumps(hrv).encode("utf-8"))
+                z.writestr("training_status.json", json.dumps(training_status).encode("utf-8"))
             
             final_payload = z_io.getvalue()
 
@@ -318,6 +325,32 @@ class GarminConnector:
         self._ledger.record_ingestion(entry)
         return entry
 
+    def get_realtime_metrics(self, user_id: str):
+        from src.ingestion.source_connector import RealtimeMetrics
+        self.authenticate()
+        today = date.today().isoformat()
+        try:
+            hr_data = self._call(self._client.get_heart_rates, today)
+            hr_values = hr_data.get('heartRateValues') or []
+            
+            latest_hr = None
+            latest_ts = None
+            for item in reversed(hr_values):
+                if item and len(item) == 2 and item[1] is not None:
+                    latest_ts = item[0]
+                    latest_hr = item[1]
+                    break
+                    
+            if latest_ts:
+                # Garmin returns ms timestamps
+                ts = datetime.fromtimestamp(latest_ts / 1000, tz=timezone.utc)
+            else:
+                ts = datetime.now(timezone.utc)
+                
+            return RealtimeMetrics(heart_rate=latest_hr, timestamp=ts)
+        except Exception as e:
+            logger.info("Failed to get real-time metrics: %s", e)
+            return RealtimeMetrics(heart_rate=None, timestamp=datetime.now(timezone.utc))
 
 def _to_json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, sort_keys=True, default=str).encode("utf-8")

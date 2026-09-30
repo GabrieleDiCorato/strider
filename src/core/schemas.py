@@ -159,6 +159,14 @@ class User(BaseModel):
     )
 
 
+class DataSourceConfig(BaseModel):
+    """An entry in the append-only history of the user's selected data source."""
+    
+    user_id: UserId = Field(..., description="FK to User.user_id.")
+    data_source: str = Field(..., description="The selected data source, e.g., 'garmin'.")
+    changed_at: datetime = Field(..., description="When this selection was made.")
+
+
 class GarminAccountLink(BaseModel):
     """Links a Strider ``user_id`` to the Garmin account used to fetch data.
 

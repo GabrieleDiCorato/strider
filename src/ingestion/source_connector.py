@@ -66,3 +66,17 @@ class SourceConnector(Protocol):
             ``supported_entities()``.
         """
         ...
+
+from pydantic import BaseModel
+from datetime import datetime
+
+class RealtimeMetrics(BaseModel):
+    heart_rate: int | None = None
+    timestamp: datetime
+
+class RealTimeConnector(Protocol):
+    """Protocol for fetching real-time data from a source."""
+    
+    def get_realtime_metrics(self, user_id: str) -> RealtimeMetrics:
+        """Poll the source for the most recent available real-time metrics."""
+        ...
