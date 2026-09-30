@@ -8,7 +8,7 @@ from src.agent.journal import JournalStore
 from src.agent.memory import MemoryStore
 from src.agent.insights_log import InsightsLog
 from src.agent.tools import ToolContext
-from src.agent.llm import AdkNarrativeGenerator
+from src.agent.llm import AdkLLMGenerator, LLMGenerator
 from src.ingestion.ledger import SyncLedger
 from src.analytics.queries import get_connection
 
@@ -50,12 +50,17 @@ def get_tool_context(
     finally:
         conn.close()
 
+def get_llm_generator(
+    settings: Annotated[Settings, Depends(get_settings)]
+) -> LLMGenerator:
+    return AdkLLMGenerator(settings.llm)
+
 def get_coach(
     settings: Annotated[Settings, Depends(get_settings)],
     tool_context: Annotated[ToolContext, Depends(get_tool_context)],
-    insights: Annotated[InsightsLog, Depends(get_insights_log)]
+    insights: Annotated[InsightsLog, Depends(get_insights_log)],
+    generator: Annotated[LLMGenerator, Depends(get_llm_generator)]
 ) -> Coach:
-    generator = AdkNarrativeGenerator(settings.llm)
     return Coach(
         settings=settings,
         generator=generator,

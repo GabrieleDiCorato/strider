@@ -9,12 +9,12 @@ from google.genai import types
 from src.core.config import LlmSettings
 
 
-class NarrativeGenerator(Protocol):
+class LLMGenerator(Protocol):
     async def generate(self, *, action_id: str, instruction: str, user_message: str,
                        output_model: type[BaseModel]) -> str: ...
 
 
-class AdkNarrativeGenerator:
+class AdkLLMGenerator:
     def __init__(self, settings: LlmSettings):
         self._settings = settings
         if settings.api_key:

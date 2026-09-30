@@ -48,7 +48,10 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(data)
-                }).then(() => window.location.reload());
+                }).then(() => {
+                    sessionStorage.setItem('pendingToast', JSON.stringify({message: 'Saved to journal successfully', isError: false}));
+                    window.location.reload();
+                });
             " style="display: flex; flex-direction: column; gap: var(--space-4);">
                 
                 <label>
@@ -118,7 +121,10 @@
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({text: text})
-                    }).then(() => window.location.reload());
+                    }).then(() => {
+                        sessionStorage.setItem('pendingToast', JSON.stringify({message: 'Smart log saved', isError: false}));
+                        window.location.reload();
+                    });
                 }
             </script>
         </div>

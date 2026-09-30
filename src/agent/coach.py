@@ -7,14 +7,14 @@ from pydantic import ValidationError
 
 from src.core.config import Settings
 from src.agent.actions import ACTIONS, ActionSpec, NoDataError
-from src.agent.llm import NarrativeGenerator
+from src.agent.llm import LLMGenerator
 from src.agent.tools import ToolContext
 from src.agent.insights_log import InsightsLog, ActionResult, ActionStatus
 from src.agent.prompts import BASE_SYSTEM_PROMPT, render_user_message
 from src.core.schemas import EntrySource, JournalCategory
 
 class Coach:
-    def __init__(self, settings: Settings, *, generator: NarrativeGenerator | None = None,
+    def __init__(self, settings: Settings, *, generator: LLMGenerator | None = None,
                  tool_context: ToolContext | None = None, insights: InsightsLog | None = None,
                  clock: Callable[[], date] = lambda: datetime.now(timezone.utc).date()):
         self.settings = settings

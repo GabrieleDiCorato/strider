@@ -5,14 +5,14 @@ A vendor-agnostic, local-first Personal AI Running Coach. Strider ingests wearab
 
 ## Tech Stack
 
-- **Package management:** [uv](https://docs.astral.sh/uv/)
-- **Config & validation:** `pydantic`, `pydantic-settings`
-- **Ingestion:** `garminconnect`
-- **Parsing:** `fitdecode` (FIT files), `polars` (JSON/time-series shredding)
-- **Data processing:** `polars`
+- **Package Management:** [uv](https://docs.astral.sh/uv/)
+- **Backend:** `fastapi`, `uvicorn`
+- **Frontend / UI:** `jinja2` templates, `htmx`, and vanilla CSS
+- **Data Processing:** `polars` for computation, `pandera` for typed DataFrame contracts
 - **Storage:** `duckdb` + local Hive-partitioned `parquet` files
-- **Backend:** `fastapi`
-- **Agentic layer:** LLM-based coach P.o.C. built with `Google ADK`
+- **Parsing & Ingestion:** `garminconnect` for API, `fitdecode` for FIT binary files
+- **Config & Validation:** `pydantic`, `pydantic-settings`
+- **Agentic Layer:** `google-adk`
 
 ## Data Architecture
 
